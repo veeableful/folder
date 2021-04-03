@@ -1,4 +1,4 @@
-module folder
+module github.com/veeableful/folder
 
 go 1.16
 
