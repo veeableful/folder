@@ -1,0 +1,12 @@
+*.json
+*.jsonl
+!assets/*.jsonl
+.DS_Store
+*.sh
+*.so
+
+# Folder index files
+*.fns
+*.dcs
+*.dst
+*.tst

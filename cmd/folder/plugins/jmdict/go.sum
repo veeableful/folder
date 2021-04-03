@@ -1,0 +1,4 @@
+github.com/FooSoft/jmdict v0.0.0-20190926045629-808d66c7b050 h1:3VWk8B61jEgfcV+pEgzWO1j7TVXC9g5QaS0J06994Zc=
+github.com/FooSoft/jmdict v0.0.0-20190926045629-808d66c7b050/go.mod h1:zo92ezZlNld5cN1iuS0QRAmSsHcpvcqGZLVNKPM4Hlg=
+github.com/fatih/structs v1.1.0 h1:Q7juDM0QtcnhCpeyLGQKyg4TOIghuNXrkL32pHAUMxo=
+github.com/fatih/structs v1.1.0/go.mod h1:9NiDSp5zOcgEDl+j00MP/WkGVPOlPRLejGD8Ga6PJ7M=
