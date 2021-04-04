@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -48,6 +49,36 @@ func Load(indexName string) (index Index, err error) {
 	return
 }
 
+// LoadFS loads an index from files using FS
+func LoadFS(f fs.FS, indexName string) (index Index, err error) {
+	index.FieldNames = make([]string, 0)
+	index.Documents = make(map[string]map[string]interface{})
+	index.DocumentStats = map[string]DocumentStat{}
+	index.TermStats = map[string]TermStat{}
+
+	err = index.loadFieldNamesFS(f, indexName)
+	if err != nil {
+		return
+	}
+
+	err = index.loadDocumentsFS(f, indexName)
+	if err != nil {
+		return
+	}
+
+	err = index.loadDocumentStatsFS(f, indexName)
+	if err != nil {
+		return
+	}
+
+	err = index.loadTermStatsFS(f, indexName)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 func (index *Index) loadFieldNames(indexName string) (err error) {
 	var file *os.File
 
@@ -57,11 +88,29 @@ func (index *Index) loadFieldNames(indexName string) (err error) {
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	err = index.loadFieldNamesFromReader(file)
+	return
+}
+
+func (index *Index) loadFieldNamesFS(f fs.FS, indexName string) (err error) {
+	var file fs.File
+
+	file, err = f.Open(fmt.Sprintf(".%s.%s", indexName, FieldNamesFileExtension))
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	err = index.loadFieldNamesFromReader(file)
+	return
+}
+
+func (index *Index) loadFieldNamesFromReader(r io.Reader) (err error) {
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		index.FieldNames = append(index.FieldNames, scanner.Text())
 	}
-
+	err = scanner.Err()
 	return
 }
 
@@ -74,10 +123,28 @@ func (index *Index) loadDocuments(indexName string) (err error) {
 	}
 	defer file.Close()
 
-	r := csv.NewReader(file)
+	err = index.loadDocumentsFromReader(file)
+	return
+}
+
+func (index *Index) loadDocumentsFS(f fs.FS, indexName string) (err error) {
+	var file fs.File
+
+	file, err = f.Open(fmt.Sprintf(".%s.%s", indexName, DocumentsFileExtension))
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	err = index.loadDocumentsFromReader(file)
+	return
+}
+
+func (index *Index) loadDocumentsFromReader(r io.Reader) (err error) {
+	csvr := csv.NewReader(r)
 
 	var record []string
-	record, err = r.Read()
+	record, err = csvr.Read()
 	if err != nil {
 		return
 	}
@@ -85,7 +152,7 @@ func (index *Index) loadDocuments(indexName string) (err error) {
 	headers := record
 
 	for {
-		record, err = r.Read()
+		record, err = csvr.Read()
 		if err != nil {
 			if err == io.EOF {
 				err = nil
@@ -97,7 +164,6 @@ func (index *Index) loadDocuments(indexName string) (err error) {
 		id := record[0]
 		index.Documents[id] = documentFromRecord(headers[1:], record[1:])
 	}
-
 	return
 }
 
@@ -120,16 +186,34 @@ func (index *Index) loadDocumentStats(indexName string) (err error) {
 	}
 	defer file.Close()
 
-	r := csv.NewReader(file)
+	err = index.loadDocumentStatsFromReader(file)
+	return
+}
+
+func (index *Index) loadDocumentStatsFS(f fs.FS, indexName string) (err error) {
+	var file fs.File
+
+	file, err = f.Open(fmt.Sprintf(".%s.%s", indexName, DocumentStatsFileExtension))
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	err = index.loadDocumentStatsFromReader(file)
+	return
+}
+
+func (index *Index) loadDocumentStatsFromReader(r io.Reader) (err error) {
+	csvr := csv.NewReader(r)
 
 	var record []string
-	_, err = r.Read()
+	_, err = csvr.Read()
 	if err != nil {
 		return
 	}
 
 	for {
-		record, err = r.Read()
+		record, err = csvr.Read()
 		if err != nil {
 			if err == io.EOF {
 				err = nil
@@ -155,7 +239,6 @@ func (index *Index) loadDocumentStats(indexName string) (err error) {
 			}
 		}
 	}
-
 	return
 }
 
@@ -168,16 +251,34 @@ func (index *Index) loadTermStats(indexName string) (err error) {
 	}
 	defer file.Close()
 
-	r := csv.NewReader(file)
+	err = index.loadTermStatsFromReader(file)
+	return
+}
+
+func (index *Index) loadTermStatsFS(f fs.FS, indexName string) (err error) {
+	var file fs.File
+
+	file, err = f.Open(fmt.Sprintf(".%s.%s", indexName, TermStatsFileExtension))
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	err = index.loadTermStatsFromReader(file)
+	return
+}
+
+func (index *Index) loadTermStatsFromReader(r io.Reader) (err error) {
+	csvr := csv.NewReader(r)
 
 	var record []string
-	_, err = r.Read()
+	_, err = csvr.Read()
 	if err != nil {
 		return
 	}
 
 	for {
-		record, err = r.Read()
+		record, err = csvr.Read()
 		if err != nil {
 			if err == io.EOF {
 				err = nil
@@ -192,7 +293,6 @@ func (index *Index) loadTermStats(indexName string) (err error) {
 		termStat.DocumentIDs = append(index.TermStats[term].DocumentIDs, ids...)
 		index.TermStats[term] = termStat
 	}
-
 	return
 }
 
