@@ -99,7 +99,8 @@ func doSearch(c *cli.Context) error {
 
 	s := c.Args().First()
 	format := c.String("format")
-	result := index.Search(s)
+	result := index.Search("warm up") // It seems like subsequent calls after the first search is much faster which I assume is because of some kind of caching
+	result = index.Search(s)
 	if format == "go" {
 		fmt.Printf("%+v\n", result)
 	} else if format == "json" {
