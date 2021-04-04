@@ -1,6 +1,7 @@
 package folder
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,27 +16,7 @@ func init() {
 }
 
 func TestAnalyze(t *testing.T) {
-	expectedResult := AnalyzeResult{
-		Tokens: []Token{
-			{
-				Token:    "my",
-				Position: 0,
-			},
-			{
-				Token:    "name",
-				Position: 1,
-			},
-			{
-				Token:    "lilis",
-				Position: 3,
-			},
-			{
-				Token:    "iskandar",
-				Position: 4,
-			},
-		},
-	}
-
+	expectedResult := []string{"my", "name", "lilis", "iskandar"}
 	index := New()
 	res := index.Analyze("My name is Lilis Iskandar")
 	assert.Equal(t, res, expectedResult)
@@ -91,4 +72,44 @@ func BenchmarkSearch(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		index.Search("ashtanga yoga los angeles")
 	}
+}
+
+func TestUpdate(t *testing.T) {
+	index := New()
+
+	originalDocument := map[string]interface{}{
+		"title": "Folder is a tiny little static search engine",
+		"author": map[string]interface{}{
+			"name": "Chae-Young Song",
+		},
+	}
+	updatedDocument := map[string]interface{}{
+		"title": "Folder v0.1.0 has been released!",
+		"author": map[string]interface{}{
+			"name": "Lilis Iskandar",
+		},
+	}
+
+	documentID, err := index.Index(originalDocument)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// We should be able to find the original document and not find the updated document
+	searchResult := index.Search("chaeyoung search")
+	assert.Equal(t, len(searchResult.Hits), 1)
+	fmt.Printf("%+v\n", searchResult)
+
+	searchResult = index.Search("lilis released")
+	assert.Equal(t, len(searchResult.Hits), 0)
+
+	// After update, we should be able to find the updated document and not find the original document
+	index.Update(documentID, updatedDocument)
+
+	searchResult = index.Search("chaeyoung search")
+	assert.Equal(t, len(searchResult.Hits), 0)
+
+	searchResult = index.Search("lilis released")
+	assert.Equal(t, len(searchResult.Hits), 1)
+	fmt.Printf("%+v\n", searchResult)
 }

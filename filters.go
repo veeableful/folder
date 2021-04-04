@@ -15,32 +15,32 @@ var (
 )
 
 // LowercaseFilter converts the tokens into their lowercase counterparts
-func LowercaseFilter(tokens []Token) (filteredTokens []Token) {
+func LowercaseFilter(tokens []string) (filteredTokens []string) {
 	for _, token := range tokens {
-		token.Token = strings.ToLower(token.Token)
+		token = strings.ToLower(token)
 		filteredTokens = append(filteredTokens, token)
 	}
 	return
 }
 
 // PunctuationFilter removes punctuations from tokens
-func PunctuationFilter(tokens []Token) (filteredTokens []Token) {
+func PunctuationFilter(tokens []string) (filteredTokens []string) {
 	for _, token := range tokens {
-		token.Token = strings.Map(func(r rune) rune {
+		token = strings.Map(func(r rune) rune {
 			if strings.ContainsRune(punctuations, r) {
 				return -1
 			}
 			return r
-		}, token.Token)
+		}, token)
 		filteredTokens = append(filteredTokens, token)
 	}
 	return
 }
 
 // StopWordFilter removes tokens that are stop words
-func StopWordFilter(tokens []Token) (filteredTokens []Token) {
+func StopWordFilter(tokens []string) (filteredTokens []string) {
 	for _, token := range tokens {
-		if !stopWordsSet.Contains(token.Token) {
+		if !stopWordsSet.Contains(token) {
 			filteredTokens = append(filteredTokens, token)
 		}
 	}

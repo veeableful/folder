@@ -66,17 +66,6 @@ type SearchResult struct {
 	Time  SearchTime
 }
 
-// AnalyzeResult contains the tokens extracted from an analysis.
-type AnalyzeResult struct {
-	Tokens []Token
-}
-
-// Token contains the token string and its position within the analyzed text.
-type Token struct {
-	Token    string
-	Position int
-}
-
 // Hit contains metadata of a document such as its ID and score, and also the document iself.
 type Hit struct {
 	ID     string
@@ -85,24 +74,50 @@ type Hit struct {
 }
 
 // Index indexes a document into the index.
-func (index *Index) Index(document map[string]interface{}) (err error) {
-	documentID := index.nextDocumentID()
+func (index *Index) Index(document map[string]interface{}) (documentID string, err error) {
+	documentID = index.nextDocumentID()
+	err = index.Update(documentID, document)
+	return
+}
 
-	// Store the documents a.k.a. field values
+// Update updates an existing document in the index with new data.
+func (index *Index) Update(documentID string, document map[string]interface{}) (err error) {
 	if index.Documents == nil {
 		index.Documents = make(map[string]map[string]interface{})
 	}
-	index.Documents[documentID] = document
 
-	// Store field term stats
-	for fieldName, fieldValue := range document {
-		parentFieldNames := []string{}
-		err = index.index(documentID, fieldName, fieldValue, parentFieldNames)
-		if err != nil {
-			return
+	err = index.Delete(documentID)
+	if err != nil {
+		return
+	}
+
+	index.Documents[documentID] = document
+	err = index.index(documentID, document)
+	if err != nil {
+		return
+	}
+	return
+}
+
+// Delete deletes an existing document in the index.
+func (index *Index) Delete(documentID string) (err error) {
+	document, ok := index.Documents[documentID]
+	if !ok {
+		return
+	}
+
+	m := make(map[string][]string)
+	index.analyze("", document, m)
+
+	allTokens := MakeStringSet([]string{})
+	for _, tokens := range m {
+		for _, token := range tokens {
+			allTokens.Add(token)
 		}
 	}
 
+	delete(index.DocumentStats, documentID)
+	index.removeDocumentFromTermStats(documentID, allTokens.List())
 	return
 }
 
@@ -114,33 +129,21 @@ func (index *Index) Search(s string) (res SearchResult) {
 	var scores []float64
 
 	startTime := time.Now()
-	analyzeResult := index.Analyze(s)
-	matchedDocumentIDs, res.Time.Match = index.findDocuments(analyzeResult.Tokens)
-	sortedDocumentIDs, scores, res.Time.Sort = index.sortDocuments(matchedDocumentIDs, analyzeResult.Tokens)
+	tokens := index.Analyze(s)
+	matchedDocumentIDs, res.Time.Match = index.findDocuments(tokens)
+	sortedDocumentIDs, scores, res.Time.Sort = index.sortDocuments(matchedDocumentIDs, tokens)
 	res.Hits = index.fetchHits(sortedDocumentIDs, scores, 10)
 	res.Count = len(sortedDocumentIDs)
 	res.Time.Total = time.Since(startTime)
-
 	return
 }
 
-// Analyze breaks down search terms into list of tokens with some metadata such positions.
-func (index *Index) Analyze(s string) (res AnalyzeResult) {
+// AnalyzeString breaks down string into list of tokens with some metadata such positions.
+func (index *Index) Analyze(s string) (tokens []string) {
 	s = strings.Trim(s, " ")
-	ss := strings.Split(s, " ")
-
-	tokens := res.Tokens
-	for i, v := range ss {
-		tokens = append(tokens, Token{
-			Token:    v,
-			Position: i,
-		})
-	}
-
+	tokens = strings.Split(s, " ")
 	tokens = LowercaseFilter(tokens)
 	tokens = PunctuationFilter(tokens)
 	tokens = StopWordFilter(tokens)
-	res.Tokens = tokens
-
 	return
 }

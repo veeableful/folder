@@ -10,14 +10,30 @@ const (
 
 type Empty struct{}
 
-func contains(list []string, s string) (yes bool) {
+func contains(list []string, s string) bool {
 	for _, v := range list {
 		if v == s {
-			yes = true
-			return
+			return true
 		}
 	}
-	return
+	return false
+}
+
+func find(list []string, s string) int {
+	for i, v := range list {
+		if v == s {
+			return i
+		}
+	}
+	return -1
+}
+
+func remove(list []string, s string) []string {
+	i := find(list, s)
+	if i < 0 {
+		return list
+	}
+	return append(list[:i], list[i+1:]...)
 }
 
 func generateRandomID(n int) string {

@@ -36,54 +36,57 @@ func setField(document map[string]interface{}, fieldPath, record string) {
 	}
 }
 
-func (index *Index) index(documentID, fieldName string, fieldValue interface{}, parentFieldNames []string) (err error) {
-	switch concreteFieldValue := fieldValue.(type) {
+// analyze analyzes an arbitrary value and returns the tokens for each field
+func (index *Index) analyze(parentField string, v interface{}, m map[string][]string) {
+	if m == nil {
+		return
+	}
+
+	switch value := v.(type) {
 	case map[string]interface{}:
-		for nextFieldName, nextFieldValue := range concreteFieldValue {
-			parentFieldNames = append(parentFieldNames, fieldName)
-			err = index.index(documentID, nextFieldName, nextFieldValue, parentFieldNames)
-			if err != nil {
-				return
+		for field, value := range value {
+			if parentField != "" {
+				field = parentField + "." + field
 			}
-			parentFieldNames = parentFieldNames[:len(parentFieldNames)-1]
+			index.analyze(field, value, m)
 		}
-	case string:
-		fullFieldName := strings.Join(append(parentFieldNames, fieldName), ".")
-		err = index.indexString(documentID, fullFieldName, concreteFieldValue)
-		if err != nil {
-			return
-		}
-	case *string:
-		if concreteFieldValue == nil {
-			return
-		}
-		fullFieldName := strings.Join(append(parentFieldNames, fieldName), ".")
-		err = index.indexString(documentID, fullFieldName, *concreteFieldValue)
-		if err != nil {
-			return
+	case []map[string]interface{}:
+		for _, v := range value {
+			index.analyze(parentField, v, m)
 		}
 	case []interface{}:
-		for _, nextFieldValue := range concreteFieldValue {
-			err = index.index(documentID, fieldName, nextFieldValue, parentFieldNames)
-			if err != nil {
-				return
-			}
+		for _, v := range value {
+			index.analyze(parentField, v, m)
 		}
 	case []string:
-		for _, nextFieldValue := range concreteFieldValue {
-			err = index.index(documentID, fieldName, nextFieldValue, parentFieldNames)
-			if err != nil {
-				return
-			}
+		tokens := []string{}
+		for _, v := range value {
+			tokens = append(tokens, index.Analyze(v)...)
 		}
+		m[parentField] = tokens
+	case *string:
+		if value != nil {
+			m[parentField] = index.Analyze(*value)
+		}
+	case string:
+		m[parentField] = index.Analyze(value)
+	case int:
+		// TODO
+	}
+}
+
+func (index *Index) index(documentID string, document map[string]interface{}) (err error) {
+	m := make(map[string][]string)
+	index.analyze("", document, m)
+	for field, tokens := range m {
+		index.indexTokens(documentID, field, tokens)
 	}
 	return
 }
 
-func (index *Index) indexString(documentID, field, value string) (err error) {
-	analyzeResult := index.Analyze(value)
-	index.updateDocumentStat(documentID, analyzeResult.Tokens)
-	index.updateTermStat(documentID, analyzeResult.Tokens)
+func (index *Index) indexTokens(documentID string, field string, tokens []string) (err error) {
+	index.updateDocumentStat(documentID, tokens)
+	index.updateTermStat(documentID, tokens)
 	if contains(index.FieldNames, field) {
 		return
 	}
@@ -91,7 +94,7 @@ func (index *Index) indexString(documentID, field, value string) (err error) {
 	return
 }
 
-func (index *Index) updateDocumentStat(documentID string, tokens []Token) {
+func (index *Index) updateDocumentStat(documentID string, tokens []string) {
 	var documentStat DocumentStat
 
 	if index.DocumentStats == nil {
@@ -102,21 +105,21 @@ func (index *Index) updateDocumentStat(documentID string, tokens []Token) {
 
 	for _, token := range tokens {
 		if documentStat.TermFrequency == nil {
-			documentStat.TermFrequency = map[string]int{token.Token: 1}
+			documentStat.TermFrequency = map[string]int{token: 1}
 		} else {
-			documentStat.TermFrequency[token.Token] += 1
+			documentStat.TermFrequency[token] += 1
 		}
 		if documentStat.TermFrequency == nil {
-			documentStat.TermFrequency = map[string]int{token.Token: 1}
+			documentStat.TermFrequency = map[string]int{token: 1}
 		} else {
-			documentStat.TermFrequency[token.Token] += 1
+			documentStat.TermFrequency[token] += 1
 		}
 	}
 
 	index.DocumentStats[documentID] = documentStat
 }
 
-func (index *Index) updateTermStat(documentID string, tokens []Token) {
+func (index *Index) updateTermStat(documentID string, tokens []string) {
 	var termStat TermStat
 	var ok bool
 
@@ -125,7 +128,7 @@ func (index *Index) updateTermStat(documentID string, tokens []Token) {
 	}
 
 	for _, token := range tokens {
-		termStat, ok = index.TermStats[token.Token]
+		termStat, ok = index.TermStats[token]
 		if ok {
 			termStat.DocumentIDs = append(termStat.DocumentIDs, documentID)
 		} else {
@@ -135,7 +138,19 @@ func (index *Index) updateTermStat(documentID string, tokens []Token) {
 				termStat.DocumentIDs = append(termStat.DocumentIDs, documentID)
 			}
 		}
-		index.TermStats[token.Token] = termStat
+		index.TermStats[token] = termStat
+	}
+}
+
+func (index *Index) removeDocumentFromTermStats(documentID string, tokens []string) {
+	for _, token := range tokens {
+		termStat, ok := index.TermStats[token]
+		if !ok {
+			continue
+		}
+
+		termStat.DocumentIDs = remove(termStat.DocumentIDs, documentID)
+		index.TermStats[token] = termStat
 	}
 }
 
@@ -144,7 +159,7 @@ func (index *Index) nextDocumentID() (id string) {
 	return
 }
 
-func (index *Index) findDocuments(tokens []Token) (documentIDs []string, elapsedTime time.Duration) {
+func (index *Index) findDocuments(tokens []string) (documentIDs []string, elapsedTime time.Duration) {
 	startTime := time.Now()
 
 	var documentIDsSet StringSet
@@ -152,7 +167,7 @@ func (index *Index) findDocuments(tokens []Token) (documentIDs []string, elapsed
 	for _, token := range tokens {
 		ids := MakeStringSet([]string{})
 
-		termStat, ok := index.TermStats[token.Token]
+		termStat, ok := index.TermStats[token]
 		if !ok {
 			continue
 		}
@@ -175,7 +190,7 @@ func (index *Index) findDocuments(tokens []Token) (documentIDs []string, elapsed
 	return
 }
 
-func (index *Index) sortDocuments(documentIDs []string, tokens []Token) (sortedDocumentIDs []string, sortedScores []float64, elapsedTime time.Duration) {
+func (index *Index) sortDocuments(documentIDs []string, tokens []string) (sortedDocumentIDs []string, sortedScores []float64, elapsedTime time.Duration) {
 	startTime := time.Now()
 
 	scores := make([]float64, len(documentIDs))
@@ -192,7 +207,7 @@ func (index *Index) sortDocuments(documentIDs []string, tokens []Token) (sortedD
 	return
 }
 
-func (index *Index) calculateScore(documentID string, tokens []Token) (score float64) {
+func (index *Index) calculateScore(documentID string, tokens []string) (score float64) {
 	for _, token := range tokens {
 		score += float64(index.termFrequency(documentID, token)) * float64(index.inverseDocumentFrequency(token))
 	}
@@ -219,20 +234,20 @@ func (index *Index) fetchHits(documentIDs []string, scores []float64, size int) 
 }
 
 // termFrequency returns the number of times a token appears in a certain document
-func (index *Index) termFrequency(id string, token Token) (frequency int) {
-	frequency = index.DocumentStats[id].TermFrequency[token.Token]
+func (index *Index) termFrequency(id, token string) (frequency int) {
+	frequency = index.DocumentStats[id].TermFrequency[token]
 	return
 }
 
 // inverseDocumentFrequency calculates how rare a token is across all documents
-func (index *Index) inverseDocumentFrequency(token Token) (frequency float64) {
+func (index *Index) inverseDocumentFrequency(token string) (frequency float64) {
 	frequency = math.Log10(float64(len(index.Documents)) / float64(index.documentFrequency(token)))
 	return
 }
 
 // documentFrequency returns the number of documents a token is available in
-func (index *Index) documentFrequency(token Token) (frequency int) {
-	frequency = len(index.TermStats[token.Token].DocumentIDs)
+func (index *Index) documentFrequency(token string) (frequency int) {
+	frequency = len(index.TermStats[token].DocumentIDs)
 	return
 }
 

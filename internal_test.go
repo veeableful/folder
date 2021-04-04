@@ -6,24 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSetField(t *testing.T) {
-	document := make(map[string]interface{})
-
-	setField(document, "name", "Lilis Iskandar")
-	setField(document, "details.location", "Malaysia")
-
-	expectedResult := map[string]interface{}{
-		"name": "Lilis Iskandar",
-		"details": map[string]interface{}{
-			"location": "Malaysia",
-		},
-	}
-
-	assert.Equal(t, document, expectedResult)
-}
-
-func TestValueFromMapStringInterface(t *testing.T) {
-	document := map[string]interface{}{
+var (
+	testDocument = map[string]interface{}{
 		"project": "Folder",
 		"author": []map[string]interface{}{
 			{
@@ -44,8 +28,40 @@ func TestValueFromMapStringInterface(t *testing.T) {
 			},
 		},
 	}
+)
 
-	assert.Equal(t, fieldValuesFromRoot(document, "project"), []string{"Folder"})
-	assert.Equal(t, fieldValuesFromRoot(document, "author.name"), []string{"Lilis Iskandar"})
-	assert.Equal(t, fieldValuesFromRoot(document, "author.coworkers.name"), []string{"Chae-Young Song"})
+func TestSetField(t *testing.T) {
+	document := make(map[string]interface{})
+
+	setField(document, "name", "Lilis Iskandar")
+	setField(document, "details.location", "Malaysia")
+
+	expectedResult := map[string]interface{}{
+		"name": "Lilis Iskandar",
+		"details": map[string]interface{}{
+			"location": "Malaysia",
+		},
+	}
+
+	assert.Equal(t, document, expectedResult)
+}
+
+func TestValueFromMapStringInterface(t *testing.T) {
+	assert.Equal(t, fieldValuesFromRoot(testDocument, "project"), []string{"Folder"})
+	assert.Equal(t, fieldValuesFromRoot(testDocument, "author.name"), []string{"Lilis Iskandar"})
+	assert.Equal(t, fieldValuesFromRoot(testDocument, "author.coworkers.name"), []string{"Chae-Young Song"})
+}
+
+func TestInternalAnalyze(t *testing.T) {
+	expectedResult := map[string][]string{
+		"project":                           {"folder"},
+		"author.name":                       {"lilis", "iskandar"},
+		"author.details.location":           {"malaysia"},
+		"author.coworkers.name":             {"chaeyoung", "song"},
+		"author.coworkers.details.location": {"south", "korea"},
+	}
+	m := make(map[string][]string)
+	index := New()
+	index.analyze("", testDocument, m)
+	assert.Equal(t, m, expectedResult)
 }

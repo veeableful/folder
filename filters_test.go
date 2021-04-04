@@ -4,11 +4,11 @@ import (
 	"testing"
 )
 
-var tokens []Token
+var tokens []string
 
 func init() {
 	index := New()
-	tokens = index.Analyze("hermione oracle paulina").Tokens
+	tokens = index.Analyze("hermione oracle paulina")
 }
 
 func BenchmarkLowercaseFilter(b *testing.B) {
