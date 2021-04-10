@@ -1,16 +1,21 @@
 package folder
 
 import (
+	"io/fs"
 	"strings"
 	"time"
 )
 
 // Index contains all the information needed to search and return matching documents.
 type Index struct {
+	Name          string
 	FieldNames    []string
 	Documents     map[string]map[string]interface{}
 	DocumentStats map[string]DocumentStat
 	TermStats     map[string]TermStat
+	LoadedShards  map[int]struct{}
+	ShardCount    int
+	f             fs.FS
 }
 
 // New creates an empty index.
