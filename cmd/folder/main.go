@@ -81,7 +81,7 @@ func doIndex(c *cli.Context) (err error) {
 		}
 	}
 
-	err = index.Save(indexName)
+	err = index.SaveToShards(indexName, 100)
 	if err != nil {
 		return
 	}
@@ -92,14 +92,14 @@ func doIndex(c *cli.Context) (err error) {
 func doSearch(c *cli.Context) error {
 	indexName := c.String("index")
 
-	index, err := folder.Load(indexName)
+	index, err := folder.LoadDeferred(indexName)
 	if err != nil {
 		return err
 	}
 
 	s := c.Args().First()
 	format := c.String("format")
-	result := index.Search("warm up") // It seems like subsequent calls after the first search is much faster which I assume is because of some kind of caching
+	result := index.Search(s) // Load related shards to memory first
 	result = index.Search(s)
 	if format == "go" {
 		fmt.Printf("%+v\n", result)
