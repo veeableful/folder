@@ -185,7 +185,7 @@ func LoadDeferredFS(f fs.FS, indexName string) (index Index, err error) {
 	index.DocumentStats = map[string]DocumentStat{}
 	index.TermStats = map[string]TermStat{}
 
-	err = index.loadFieldNamesFS(f)
+	err = index.loadFieldNamesDeferred()
 	if err != nil {
 		return
 	}
@@ -207,7 +207,7 @@ func (index *Index) loadFieldNames() (err error) {
 }
 
 func (index *Index) loadFieldNamesDeferred() (err error) {
-	var file *os.File
+	var file fs.File
 
 	dirPath := fmt.Sprintf(".%s", index.Name)
 	err = os.MkdirAll(dirPath, 0700)
@@ -216,7 +216,11 @@ func (index *Index) loadFieldNamesDeferred() (err error) {
 	}
 
 	filePath := fmt.Sprintf("%s/%s", dirPath, FieldNamesFileExtension)
-	file, err = os.Open(filePath)
+	if index.f == nil {
+		file, err = os.Open(filePath)
+	} else {
+		file, err = index.f.Open(filePath)
+	}
 	if err != nil {
 		return
 	}
