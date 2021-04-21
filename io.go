@@ -210,11 +210,6 @@ func (index *Index) loadFieldNamesDeferred() (err error) {
 	var file fs.File
 
 	dirPath := fmt.Sprintf(".%s", index.Name)
-	err = os.MkdirAll(dirPath, 0700)
-	if err != nil {
-		return
-	}
-
 	filePath := fmt.Sprintf("%s/%s", dirPath, FieldNamesFileExtension)
 	if index.f == nil {
 		file, err = os.Open(filePath)
