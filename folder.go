@@ -8,14 +8,17 @@ import (
 
 // Index contains all the information needed to search and return matching documents.
 type Index struct {
-	Name          string
-	FieldNames    []string
-	Documents     map[string]map[string]interface{}
-	DocumentStats map[string]DocumentStat
-	TermStats     map[string]TermStat
-	LoadedShards  map[int]struct{}
-	ShardCount    int
-	f             fs.FS
+	Name                      string
+	FieldNames                []string
+	Documents                 map[string]map[string]interface{}
+	DocumentStats             map[string]DocumentStat
+	TermStats                 map[string]TermStat
+	LoadedDocumentsShards     map[int]struct{}
+	LoadedDocumentStatsShards map[int]struct{}
+	LoadedTermStatsShards     map[int]struct{}
+	ShardCount                int
+	f                         fs.FS
+	baseURL                   string
 }
 
 // New creates an empty index.
@@ -128,16 +131,29 @@ func (index *Index) Delete(documentID string) (err error) {
 
 // Search searches terms in an index and returns matching documents from the index along with some
 // metadata.
-func (index *Index) Search(s string) (res SearchResult) {
+func (index *Index) Search(s string) (res SearchResult, err error) {
 	var matchedDocumentIDs []string
 	var sortedDocumentIDs []string
 	var scores []float64
 
 	startTime := time.Now()
 	tokens := index.Analyze(s)
-	matchedDocumentIDs, res.Time.Match = index.findDocuments(tokens)
-	sortedDocumentIDs, scores, res.Time.Sort = index.sortDocuments(matchedDocumentIDs, tokens)
-	res.Hits = index.fetchHits(sortedDocumentIDs, scores, 10)
+
+	matchedDocumentIDs, res.Time.Match, err = index.findDocuments(tokens)
+	if err != nil {
+		return
+	}
+
+	sortedDocumentIDs, scores, res.Time.Sort, err = index.sortDocuments(matchedDocumentIDs, tokens)
+	if err != nil {
+		return
+	}
+
+	res.Hits, err = index.fetchHits(sortedDocumentIDs, scores, 10)
+	if err != nil {
+		return
+	}
+
 	res.Count = len(sortedDocumentIDs)
 	res.Time.Total = time.Since(startTime)
 	return

@@ -1,3 +1,5 @@
+// +build !js
+
 package folder
 
 import (
@@ -11,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -18,7 +21,10 @@ const (
 	DocumentsFileExtension     = "dcs"
 	DocumentStatsFileExtension = "dst"
 	TermStatsFileExtension     = "tst"
+	ShardCountFileName         = "shard_count"
 )
+
+type ProgressCallback func(loadedShardsCount, totalShardsCount int)
 
 // Load loads an index from files
 func Load(indexName string) (index Index, err error) {
@@ -54,7 +60,9 @@ func Load(indexName string) (index Index, err error) {
 // LoadDeferred loads an index metadata only the rest of the data is loaded when needed.
 func LoadDeferred(indexName string) (index Index, err error) {
 	index.Name = indexName
-	index.LoadedShards = map[int]struct{}{}
+	index.LoadedDocumentsShards = map[int]struct{}{}
+	index.LoadedDocumentStatsShards = map[int]struct{}{}
+	index.LoadedTermStatsShards = map[int]struct{}{}
 
 	err = index.loadShardCount()
 	if err != nil {
@@ -75,7 +83,7 @@ func LoadDeferred(indexName string) (index Index, err error) {
 }
 
 func (index *Index) loadShardCount() (err error) {
-	dirPath := fmt.Sprintf(".%s", index.Name)
+	dirPath := fmt.Sprintf("%s", index.Name)
 
 	err = filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, e error) (err error) {
 		if e != nil {
@@ -103,7 +111,7 @@ func (index *Index) loadShardCount() (err error) {
 }
 
 func (index *Index) loadShardCountFS(f fs.FS) (err error) {
-	dirPath := fmt.Sprintf(".%s", index.Name)
+	dirPath := fmt.Sprintf("%s", index.Name)
 
 	err = fs.WalkDir(f, dirPath, func(path string, d fs.DirEntry, e error) (err error) {
 		if e != nil {
@@ -172,7 +180,9 @@ func LoadFS(f fs.FS, indexName string) (index Index, err error) {
 // LoadDeferredFS loads an index metadata only the rest of the data is loaded when needed.
 func LoadDeferredFS(f fs.FS, indexName string) (index Index, err error) {
 	index.Name = indexName
-	index.LoadedShards = map[int]struct{}{}
+	index.LoadedDocumentsShards = map[int]struct{}{}
+	index.LoadedDocumentStatsShards = map[int]struct{}{}
+	index.LoadedTermStatsShards = map[int]struct{}{}
 	index.f = f
 
 	err = index.loadShardCountFS(f)
@@ -193,10 +203,41 @@ func LoadDeferredFS(f fs.FS, indexName string) (index Index, err error) {
 	return
 }
 
+// LoadWithProgressFS loads the entire index however user can monitor progress by passing a progress callback and also specify sleep duration between each shard.
+func LoadWithProgressFS(f fs.FS, indexName string, progressCallback ProgressCallback, sleepDuration time.Duration) (index Index, err error) {
+	index.Name = indexName
+	index.LoadedDocumentsShards = map[int]struct{}{}
+	index.LoadedDocumentStatsShards = map[int]struct{}{}
+	index.LoadedTermStatsShards = map[int]struct{}{}
+	index.f = f
+
+	err = index.loadShardCountFS(f)
+	if err != nil {
+		return
+	}
+
+	index.FieldNames = make([]string, 0)
+	index.Documents = make(map[string]map[string]interface{})
+	index.DocumentStats = map[string]DocumentStat{}
+	index.TermStats = map[string]TermStat{}
+
+	err = index.loadFieldNamesDeferred()
+	if err != nil {
+		return
+	}
+
+	err = index.loadAllShards(progressCallback, sleepDuration)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 func (index *Index) loadFieldNames() (err error) {
 	var file *os.File
 
-	file, err = os.Open(fmt.Sprintf(".%s.%s", index.Name, FieldNamesFileExtension))
+	file, err = os.Open(fmt.Sprintf("%s.%s", index.Name, FieldNamesFileExtension))
 	if err != nil {
 		return
 	}
@@ -209,7 +250,7 @@ func (index *Index) loadFieldNames() (err error) {
 func (index *Index) loadFieldNamesDeferred() (err error) {
 	var file fs.File
 
-	dirPath := fmt.Sprintf(".%s", index.Name)
+	dirPath := fmt.Sprintf("%s", index.Name)
 	filePath := fmt.Sprintf("%s/%s", dirPath, FieldNamesFileExtension)
 	if index.f == nil {
 		file, err = os.Open(filePath)
@@ -228,7 +269,7 @@ func (index *Index) loadFieldNamesDeferred() (err error) {
 func (index *Index) loadFieldNamesFS(f fs.FS) (err error) {
 	var file fs.File
 
-	file, err = f.Open(fmt.Sprintf(".%s.%s", index.Name, FieldNamesFileExtension))
+	file, err = f.Open(fmt.Sprintf("%s.%s", index.Name, FieldNamesFileExtension))
 	if err != nil {
 		return
 	}
@@ -247,34 +288,33 @@ func (index *Index) loadFieldNamesFromReader(r io.Reader) (err error) {
 	return
 }
 
-func (index *Index) loadShard(shardID int) (err error) {
-	if _, ok := index.LoadedShards[shardID]; ok {
-		return
-	}
+func (index *Index) loadAllShards(progressCallback ProgressCallback, sleepDuration time.Duration) (err error) {
+	for i := 0; i < index.ShardCount; i++ {
+		err = index.loadDocumentsFromShard(i)
+		if err != nil {
+			return
+		}
 
-	err = index.loadDocumentsFromShard(shardID)
-	if err != nil {
-		return
-	}
+		err = index.loadDocumentStatsFromShard(i)
+		if err != nil {
+			return
+		}
 
-	err = index.loadDocumentStatsFromShard(shardID)
-	if err != nil {
-		return
-	}
+		err = index.loadTermStatsFromShard(i)
+		if err != nil {
+			return
+		}
 
-	err = index.loadTermStatsFromShard(shardID)
-	if err != nil {
-		return
+		progressCallback(i+1, index.ShardCount)
+		time.Sleep(sleepDuration)
 	}
-
-	index.LoadedShards[shardID] = struct{}{}
 	return
 }
 
 func (index *Index) loadDocuments() (err error) {
 	var file *os.File
 
-	file, err = os.Open(fmt.Sprintf(".%s.%s", index.Name, DocumentsFileExtension))
+	file, err = os.Open(fmt.Sprintf("%s.%s", index.Name, DocumentsFileExtension))
 	if err != nil {
 		return
 	}
@@ -287,7 +327,13 @@ func (index *Index) loadDocuments() (err error) {
 func (index *Index) loadDocumentsFromShard(shardID int) (err error) {
 	var file fs.File
 
-	filePath := fmt.Sprintf(".%s/%d/%s", index.Name, shardID, DocumentsFileExtension)
+	if _, ok := index.LoadedDocumentsShards[shardID]; ok {
+		return
+	}
+
+	debug("Loading documents shard", shardID)
+
+	filePath := fmt.Sprintf("%s/%d/%s", index.Name, shardID, DocumentsFileExtension)
 	if index.f == nil {
 		file, err = os.Open(filePath)
 	} else {
@@ -303,13 +349,15 @@ func (index *Index) loadDocumentsFromShard(shardID int) (err error) {
 		return
 	}
 
+	index.LoadedDocumentsShards[shardID] = struct{}{}
+
 	return
 }
 
 func (index *Index) loadDocumentsFS(f fs.FS) (err error) {
 	var file fs.File
 
-	filePath := fmt.Sprintf(".%s.%s", index.Name, DocumentsFileExtension)
+	filePath := fmt.Sprintf("%s.%s", index.Name, DocumentsFileExtension)
 	if index.f == nil {
 		file, err = os.Open(filePath)
 	} else {
@@ -330,6 +378,10 @@ func (index *Index) loadDocumentsFromReader(r io.Reader) (err error) {
 	var record []string
 	record, err = csvr.Read()
 	if err != nil {
+		if err == io.EOF {
+			err = nil
+			return
+		}
 		return
 	}
 
@@ -364,7 +416,7 @@ func documentFromRecord(headers, record []string) (document map[string]interface
 func (index *Index) loadDocumentStats() (err error) {
 	var file *os.File
 
-	file, err = os.Open(fmt.Sprintf(".%s.%s", index.Name, DocumentStatsFileExtension))
+	file, err = os.Open(fmt.Sprintf("%s.%s", index.Name, DocumentStatsFileExtension))
 	if err != nil {
 		return
 	}
@@ -377,7 +429,13 @@ func (index *Index) loadDocumentStats() (err error) {
 func (index *Index) loadDocumentStatsFromShard(shardID int) (err error) {
 	var file fs.File
 
-	filePath := fmt.Sprintf(".%s/%d/%s", index.Name, shardID, DocumentStatsFileExtension)
+	if _, ok := index.LoadedDocumentStatsShards[shardID]; ok {
+		return
+	}
+
+	debug("Loading document stats shard", shardID)
+
+	filePath := fmt.Sprintf("%s/%d/%s", index.Name, shardID, DocumentStatsFileExtension)
 	if index.f == nil {
 		file, err = os.Open(filePath)
 	} else {
@@ -393,13 +451,15 @@ func (index *Index) loadDocumentStatsFromShard(shardID int) (err error) {
 		return
 	}
 
+	index.LoadedDocumentStatsShards[shardID] = struct{}{}
+
 	return
 }
 
 func (index *Index) loadDocumentStatsFS(f fs.FS) (err error) {
 	var file fs.File
 
-	file, err = f.Open(fmt.Sprintf(".%s.%s", index.Name, DocumentStatsFileExtension))
+	file, err = f.Open(fmt.Sprintf("%s.%s", index.Name, DocumentStatsFileExtension))
 	if err != nil {
 		return
 	}
@@ -415,6 +475,10 @@ func (index *Index) loadDocumentStatsFromReader(r io.Reader) (err error) {
 	var record []string
 	_, err = csvr.Read()
 	if err != nil {
+		if err == io.EOF {
+			err = nil
+			return
+		}
 		return
 	}
 
@@ -451,7 +515,7 @@ func (index *Index) loadDocumentStatsFromReader(r io.Reader) (err error) {
 func (index *Index) loadTermStats() (err error) {
 	var file *os.File
 
-	file, err = os.Open(fmt.Sprintf(".%s.%s", index.Name, TermStatsFileExtension))
+	file, err = os.Open(fmt.Sprintf("%s.%s", index.Name, TermStatsFileExtension))
 	if err != nil {
 		return
 	}
@@ -464,7 +528,13 @@ func (index *Index) loadTermStats() (err error) {
 func (index *Index) loadTermStatsFromShard(shardID int) (err error) {
 	var file fs.File
 
-	filePath := fmt.Sprintf(".%s/%d/%s", index.Name, shardID, TermStatsFileExtension)
+	if _, ok := index.LoadedTermStatsShards[shardID]; ok {
+		return
+	}
+
+	debug("Loading term stats shard", shardID)
+
+	filePath := fmt.Sprintf("%s/%d/%s", index.Name, shardID, TermStatsFileExtension)
 	if index.f == nil {
 		file, err = os.Open(filePath)
 	} else {
@@ -480,13 +550,15 @@ func (index *Index) loadTermStatsFromShard(shardID int) (err error) {
 		return
 	}
 
+	index.LoadedTermStatsShards[shardID] = struct{}{}
+
 	return
 }
 
 func (index *Index) loadTermStatsFS(f fs.FS) (err error) {
 	var file fs.File
 
-	file, err = f.Open(fmt.Sprintf(".%s.%s", index.Name, TermStatsFileExtension))
+	file, err = f.Open(fmt.Sprintf("%s.%s", index.Name, TermStatsFileExtension))
 	if err != nil {
 		return
 	}
@@ -502,6 +574,10 @@ func (index *Index) loadTermStatsFromReader(r io.Reader) (err error) {
 	var record []string
 	_, err = csvr.Read()
 	if err != nil {
+		if err == io.EOF {
+			err = nil
+			return
+		}
 		return
 	}
 
@@ -554,6 +630,11 @@ func (index *Index) SaveToShards(indexName string, shardCount int) (err error) {
 	index.Name = indexName
 	index.ShardCount = shardCount
 
+	err = index.saveShardCount()
+	if err != nil {
+		return
+	}
+
 	err = index.saveFieldNamesToShards()
 	if err != nil {
 		return
@@ -577,10 +658,34 @@ func (index *Index) SaveToShards(indexName string, shardCount int) (err error) {
 	return
 }
 
+func (index *Index) saveShardCount() (err error) {
+	var file *os.File
+
+	dirPath := fmt.Sprintf("%s", index.Name)
+	err = os.MkdirAll(dirPath, 0700)
+	if err != nil {
+		return
+	}
+
+	filePath := fmt.Sprintf("%s/%s", dirPath, ShardCountFileName)
+	file, err = os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(fmt.Sprint(index.ShardCount))
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 func (index *Index) saveFieldNames() (err error) {
 	var file *os.File
 
-	file, err = os.OpenFile(fmt.Sprintf(".%s.%s", index.Name, FieldNamesFileExtension), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	file, err = os.OpenFile(fmt.Sprintf("%s.%s", index.Name, FieldNamesFileExtension), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return
 	}
@@ -599,7 +704,7 @@ func (index *Index) saveFieldNames() (err error) {
 func (index *Index) saveFieldNamesToShards() (err error) {
 	var file *os.File
 
-	dirPath := fmt.Sprintf(".%s", index.Name)
+	dirPath := fmt.Sprintf("%s", index.Name)
 	err = os.MkdirAll(dirPath, 0700)
 	if err != nil {
 		return
@@ -625,7 +730,7 @@ func (index *Index) saveFieldNamesToShards() (err error) {
 func (index *Index) saveDocuments() (err error) {
 	var file *os.File
 
-	file, err = os.OpenFile(fmt.Sprintf(".%s.%s", index.Name, DocumentsFileExtension), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	file, err = os.OpenFile(fmt.Sprintf("%s.%s", index.Name, DocumentsFileExtension), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return
 	}
@@ -654,7 +759,7 @@ func (index *Index) saveDocumentsToShards() (err error) {
 	for shardID := 0; shardID < index.ShardCount; shardID++ {
 		var file *os.File
 
-		dirPath := fmt.Sprintf(".%s/%d/", index.Name, shardID)
+		dirPath := fmt.Sprintf("%s/%d/", index.Name, shardID)
 		err = os.MkdirAll(dirPath, 0700)
 		if err != nil {
 			return
@@ -701,7 +806,7 @@ func recordFromDocument(id string, headers []string, document map[string]interfa
 func (index *Index) saveDocumentStats() (err error) {
 	var file *os.File
 
-	file, err = os.OpenFile(fmt.Sprintf(".%s.%s", index.Name, DocumentStatsFileExtension), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	file, err = os.OpenFile(fmt.Sprintf("%s.%s", index.Name, DocumentStatsFileExtension), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return
 	}
@@ -732,7 +837,7 @@ func (index *Index) saveDocumentStatsToShards() (err error) {
 	for shardID := 0; shardID < index.ShardCount; shardID++ {
 		var file *os.File
 
-		dirPath := fmt.Sprintf(".%s/%d/", index.Name, shardID)
+		dirPath := fmt.Sprintf("%s/%d/", index.Name, shardID)
 		err = os.MkdirAll(dirPath, 0700)
 		if err != nil {
 			return
@@ -772,7 +877,7 @@ func (index *Index) saveDocumentStatsToShards() (err error) {
 func (index *Index) saveTermStats() (err error) {
 	var file *os.File
 
-	file, err = os.OpenFile(fmt.Sprintf(".%s.%s", index.Name, TermStatsFileExtension), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	file, err = os.OpenFile(fmt.Sprintf("%s.%s", index.Name, TermStatsFileExtension), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return
 	}
@@ -796,7 +901,7 @@ func (index *Index) saveTermStatsToShards() (err error) {
 	for shardID := 0; shardID < index.ShardCount; shardID++ {
 		var file *os.File
 
-		dirPath := fmt.Sprintf(".%s/%d/", index.Name, shardID)
+		dirPath := fmt.Sprintf("%s/%d/", index.Name, shardID)
 		err = os.MkdirAll(dirPath, 0700)
 		if err != nil {
 			return

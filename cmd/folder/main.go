@@ -81,7 +81,7 @@ func doIndex(c *cli.Context) (err error) {
 		}
 	}
 
-	err = index.SaveToShards(indexName, 100)
+	err = index.SaveToShards(indexName, c.Int("shards"))
 	if err != nil {
 		return
 	}
@@ -99,8 +99,16 @@ func doSearch(c *cli.Context) error {
 
 	s := c.Args().First()
 	format := c.String("format")
-	result := index.Search(s) // Load related shards to memory first
-	result = index.Search(s)
+	result, err := index.Search(s) // Load related shards to memory first
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	result, err = index.Search(s)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	if format == "go" {
 		fmt.Printf("%+v\n", result)
 	} else if format == "json" {
@@ -134,6 +142,11 @@ func main() {
 						Name:  "index",
 						Usage: "Name of the index",
 						Value: "index",
+					},
+					&cli.IntFlag{
+						Name:  "shards",
+						Usage: "Number of shards",
+						Value: 1000,
 					},
 				},
 			},

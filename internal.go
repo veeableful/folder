@@ -85,23 +85,34 @@ func (index *Index) index(documentID string, document map[string]interface{}) (e
 }
 
 func (index *Index) indexTokens(documentID string, field string, tokens []string) (err error) {
-	index.updateDocumentStat(documentID, tokens)
-	index.updateTermStat(documentID, tokens)
+	err = index.updateDocumentStat(documentID, tokens)
+	if err != nil {
+		return
+	}
+
+	err = index.updateTermStat(documentID, tokens)
+	if err != nil {
+		return
+	}
 	if contains(index.FieldNames, field) {
 		return
 	}
+
 	index.FieldNames = append(index.FieldNames, field)
 	return
 }
 
-func (index *Index) updateDocumentStat(documentID string, tokens []string) {
+func (index *Index) updateDocumentStat(documentID string, tokens []string) (err error) {
 	var documentStat DocumentStat
 
 	if index.DocumentStats == nil {
 		index.DocumentStats = make(map[string]DocumentStat)
 	}
 
-	documentStat, _ = index.fetchDocumentStat(documentID)
+	documentStat, _, err = index.fetchDocumentStat(documentID)
+	if err != nil {
+		return
+	}
 
 	for _, token := range tokens {
 		if documentStat.TermFrequency == nil {
@@ -117,19 +128,24 @@ func (index *Index) updateDocumentStat(documentID string, tokens []string) {
 	}
 
 	index.DocumentStats[documentID] = documentStat
+	return
 }
 
-func (index *Index) fetchDocumentStat(documentID string) (documentStat DocumentStat, ok bool) {
+func (index *Index) fetchDocumentStat(documentID string) (documentStat DocumentStat, ok bool, err error) {
 	documentStat, ok = index.DocumentStats[documentID]
 	if !ok && index.ShardCount > 0 {
 		shardID := index.calculateShardID(documentID)
-		index.loadShard(shardID)
+		err = index.loadDocumentStatsFromShard(shardID)
+		if err != nil {
+			return
+		}
+
 		documentStat, ok = index.DocumentStats[documentID]
 	}
 	return
 }
 
-func (index *Index) updateTermStat(documentID string, tokens []string) {
+func (index *Index) updateTermStat(documentID string, tokens []string) (err error) {
 	var termStat TermStat
 	var ok bool
 
@@ -138,7 +154,10 @@ func (index *Index) updateTermStat(documentID string, tokens []string) {
 	}
 
 	for _, token := range tokens {
-		termStat, ok = index.fetchTermStat(token)
+		termStat, ok, err = index.fetchTermStat(token)
+		if err != nil {
+			return
+		}
 		if ok {
 			termStat.DocumentIDs = append(termStat.DocumentIDs, documentID)
 		} else {
@@ -150,11 +169,19 @@ func (index *Index) updateTermStat(documentID string, tokens []string) {
 		}
 		index.TermStats[token] = termStat
 	}
+
+	return
 }
 
-func (index *Index) removeDocumentFromTermStats(documentID string, tokens []string) {
+func (index *Index) removeDocumentFromTermStats(documentID string, tokens []string) (err error) {
+	var termStat TermStat
+	var ok bool
+
 	for _, token := range tokens {
-		termStat, ok := index.fetchTermStat(token)
+		termStat, ok, err = index.fetchTermStat(token)
+		if err != nil {
+			return
+		}
 		if !ok {
 			continue
 		}
@@ -162,6 +189,8 @@ func (index *Index) removeDocumentFromTermStats(documentID string, tokens []stri
 		termStat.DocumentIDs = remove(termStat.DocumentIDs, documentID)
 		index.TermStats[token] = termStat
 	}
+
+	return
 }
 
 func (index *Index) nextDocumentID() (id string) {
@@ -169,15 +198,17 @@ func (index *Index) nextDocumentID() (id string) {
 	return
 }
 
-func (index *Index) findDocuments(tokens []string) (documentIDs []string, elapsedTime time.Duration) {
-	startTime := time.Now()
-
+func (index *Index) findDocuments(tokens []string) (documentIDs []string, elapsedTime time.Duration, err error) {
 	var documentIDsSet StringSet
+	var termStat TermStat
+	var ok bool
+
+	startTime := time.Now()
 
 	for _, token := range tokens {
 		ids := MakeStringSet([]string{})
 
-		termStat, ok := index.fetchTermStat(token)
+		termStat, ok, err = index.fetchTermStat(token)
 		if !ok {
 			continue
 		}
@@ -200,22 +231,29 @@ func (index *Index) findDocuments(tokens []string) (documentIDs []string, elapse
 	return
 }
 
-func (index *Index) fetchTermStat(token string) (termStat TermStat, ok bool) {
+func (index *Index) fetchTermStat(token string) (termStat TermStat, ok bool, err error) {
 	termStat, ok = index.TermStats[token]
 	if !ok && index.ShardCount > 0 {
 		shardID := index.calculateShardID(token)
-		index.loadShard(shardID)
+		err = index.loadTermStatsFromShard(shardID)
+		if err != nil {
+			return
+		}
+
 		termStat, ok = index.TermStats[token]
 	}
 	return
 }
 
-func (index *Index) sortDocuments(documentIDs []string, tokens []string) (sortedDocumentIDs []string, sortedScores []float64, elapsedTime time.Duration) {
+func (index *Index) sortDocuments(documentIDs []string, tokens []string) (sortedDocumentIDs []string, sortedScores []float64, elapsedTime time.Duration, err error) {
 	startTime := time.Now()
 
 	scores := make([]float64, len(documentIDs))
 	for i, id := range documentIDs {
-		scores[i] = index.calculateScore(id, tokens)
+		scores[i], err = index.calculateScore(id, tokens)
+		if err != nil {
+			return
+		}
 	}
 	idScores := IDScores{IDs: documentIDs, Scores: scores}
 	sort.Sort(sort.Reverse(idScores))
@@ -227,21 +265,35 @@ func (index *Index) sortDocuments(documentIDs []string, tokens []string) (sorted
 	return
 }
 
-func (index *Index) calculateScore(documentID string, tokens []string) (score float64) {
+func (index *Index) calculateScore(documentID string, tokens []string) (score float64, err error) {
+	var tf int
+
 	for _, token := range tokens {
-		score += float64(index.termFrequency(documentID, token)) * float64(index.inverseDocumentFrequency(token))
+		tf, err = index.termFrequency(documentID, token)
+		if err != nil {
+			return
+		}
+
+		score += float64(tf) * float64(index.inverseDocumentFrequency(token))
 	}
+
 	return
 }
 
-func (index *Index) fetchHits(documentIDs []string, scores []float64, size int) (hits []Hit) {
+func (index *Index) fetchHits(documentIDs []string, scores []float64, size int) (hits []Hit, err error) {
+	var document map[string]interface{}
+
 	if size == 0 {
 		return
 	}
 
 	hits = make([]Hit, 0)
 	for i, documentID := range documentIDs {
-		document, _ := index.fetchDocument(documentID)
+		document, _, err = index.fetchDocument(documentID)
+		if err != nil {
+			return
+		}
+
 		hits = append(hits, Hit{
 			ID:     documentID,
 			Score:  scores[i],
@@ -254,19 +306,29 @@ func (index *Index) fetchHits(documentIDs []string, scores []float64, size int) 
 	return
 }
 
-func (index *Index) fetchDocument(documentID string) (document map[string]interface{}, ok bool) {
+func (index *Index) fetchDocument(documentID string) (document map[string]interface{}, ok bool, err error) {
 	document, ok = index.Documents[documentID]
 	if !ok && index.ShardCount > 0 {
 		shardID := index.calculateShardID(documentID)
-		index.loadShard(shardID)
+		err = index.loadDocumentsFromShard(shardID)
+		if err != nil {
+			return
+		}
+
 		document, ok = index.Documents[documentID]
 	}
 	return
 }
 
 // termFrequency returns the number of times a token appears in a certain document
-func (index *Index) termFrequency(documentID, token string) (frequency int) {
-	documentStat, _ := index.fetchDocumentStat(documentID)
+func (index *Index) termFrequency(documentID, token string) (frequency int, err error) {
+	var documentStat DocumentStat
+
+	documentStat, _, err = index.fetchDocumentStat(documentID)
+	if err != nil {
+		return
+	}
+
 	frequency = documentStat.TermFrequency[token]
 	return
 }
