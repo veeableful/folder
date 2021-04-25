@@ -697,7 +697,7 @@ func (index *Index) saveFieldNames() (err error) {
 func (index *Index) saveFieldNamesToShards() (err error) {
 	var file *os.File
 
-	dirPath := fmt.Sprintf("%s", index.Name)
+	dirPath := index.Name
 	err = os.MkdirAll(dirPath, 0700)
 	if err != nil {
 		return
@@ -745,11 +745,16 @@ func (index *Index) saveDocuments() (err error) {
 }
 
 func (index *Index) saveDocumentsToShards() (err error) {
-	ws := make(map[int]*csv.Writer)
+	shardDocumentIDsMap := make(map[int][]string)
 	headers := []string{"id"}
 	headers = append(headers, index.FieldNames...)
 
-	for shardID := 0; shardID < index.ShardCount; shardID++ {
+	for documentID := range index.Documents {
+		shardID := index.calculateShardID(documentID)
+		shardDocumentIDsMap[shardID] = append(shardDocumentIDsMap[shardID], documentID)
+	}
+
+	for shardID, documentIDs := range shardDocumentIDsMap {
 		var file *os.File
 
 		dirPath := fmt.Sprintf("%s/%d/", index.Name, shardID)
@@ -767,18 +772,17 @@ func (index *Index) saveDocumentsToShards() (err error) {
 
 		w := csv.NewWriter(file)
 		w.Write(headers)
-		ws[shardID] = w
-	}
 
-	for documentID, document := range index.Documents {
-		record := recordFromDocument(documentID, headers, document)
-		shardID := index.calculateShardID(documentID)
-		ws[shardID].Write(record)
-	}
+		for _, documentID := range documentIDs {
+			document := index.Documents[documentID]
+			record := recordFromDocument(documentID, headers, document)
+			w.Write(record)
+		}
 
-	for _, w := range ws {
 		w.Flush()
+		file.Close()
 	}
+
 	return
 }
 
@@ -825,9 +829,14 @@ func (index *Index) saveDocumentStats() (err error) {
 }
 
 func (index *Index) saveDocumentStatsToShards() (err error) {
-	ws := make(map[int]*csv.Writer)
+	shardDocumentIDsMap := make(map[int][]string)
 
-	for shardID := 0; shardID < index.ShardCount; shardID++ {
+	for documentID := range index.DocumentStats {
+		shardID := index.calculateShardID(documentID)
+		shardDocumentIDsMap[shardID] = append(shardDocumentIDsMap[shardID], documentID)
+	}
+
+	for shardID, documentIDs := range shardDocumentIDsMap {
 		var file *os.File
 
 		dirPath := fmt.Sprintf("%s/%d/", index.Name, shardID)
@@ -841,29 +850,28 @@ func (index *Index) saveDocumentStatsToShards() (err error) {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
-
 		w := csv.NewWriter(file)
-		ws[shardID] = w
-	}
 
-	for documentID, documentStat := range index.DocumentStats {
-		record := []string{documentID}
-		pairs := []string{}
+		for _, documentID := range documentIDs {
+			record := []string{documentID}
+			pairs := []string{}
 
-		for term, frequency := range documentStat.TermFrequency {
-			frequencyStr := strconv.Itoa(frequency)
-			pairs = append(pairs, strings.Join([]string{term, frequencyStr}, ":"))
+			documentStat := index.DocumentStats[documentID]
+			for term, frequency := range documentStat.TermFrequency {
+				frequencyStr := strconv.Itoa(frequency)
+				pairs = append(pairs, strings.Join([]string{term, frequencyStr}, ":"))
+			}
+
+			record = append(record, strings.Join(pairs, " "))
+			shardID := index.calculateShardID(documentID)
+			shardDocumentIDsMap[shardID] = append(shardDocumentIDsMap[shardID], documentID)
+			w.Write(record)
 		}
 
-		record = append(record, strings.Join(pairs, " "))
-		shardID := index.calculateShardID(documentID)
-		ws[shardID].Write(record)
+		w.Flush()
+		file.Close()
 	}
 
-	for _, w := range ws {
-		w.Flush()
-	}
 	return
 }
 
@@ -889,9 +897,14 @@ func (index *Index) saveTermStats() (err error) {
 }
 
 func (index *Index) saveTermStatsToShards() (err error) {
-	ws := make(map[int]*csv.Writer)
+	shardTermsMap := make(map[int][]string)
 
-	for shardID := 0; shardID < index.ShardCount; shardID++ {
+	for term := range index.TermStats {
+		shardID := index.calculateShardID(term)
+		shardTermsMap[shardID] = append(shardTermsMap[shardID], term)
+	}
+
+	for shardID, terms := range shardTermsMap {
 		var file *os.File
 
 		dirPath := fmt.Sprintf("%s/%d/", index.Name, shardID)
@@ -905,22 +918,20 @@ func (index *Index) saveTermStatsToShards() (err error) {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
 
 		w := csv.NewWriter(file)
-		ws[shardID] = w
-	}
 
-	for term, stat := range index.TermStats {
-		record := []string{term}
-		record = append(record, strings.Join(stat.DocumentIDs, " "))
-		shardID := index.calculateShardID(term)
-		ws[shardID].Write(record)
-	}
+		for _, term := range terms {
+			stat := index.TermStats[term]
+			record := []string{term}
+			record = append(record, strings.Join(stat.DocumentIDs, " "))
+			w.Write(record)
+		}
 
-	for _, w := range ws {
 		w.Flush()
+		file.Close()
 	}
+
 	return
 }
 
