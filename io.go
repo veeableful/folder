@@ -138,13 +138,6 @@ func (index *Index) loadShardCountFS(f fs.FS) (err error) {
 	return
 }
 
-func (index *Index) calculateShardID(s string) (shardID int) {
-	for _, r := range s {
-		shardID = (shardID + int(r)) % index.ShardCount
-	}
-	return
-}
-
 // LoadFS loads an index from files using FS
 func LoadFS(f fs.FS, indexName string) (index Index, err error) {
 	index.Name = indexName

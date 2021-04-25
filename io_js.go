@@ -66,13 +66,6 @@ func (index *Index) loadShardCount() (err error) {
 	return
 }
 
-func (index *Index) calculateShardID(s string) (shardID int) {
-	for _, r := range s {
-		shardID = (shardID + int(r)) % index.ShardCount
-	}
-	return
-}
-
 func (index *Index) loadFieldNamesDeferred() (err error) {
 	var resp *http.Response
 

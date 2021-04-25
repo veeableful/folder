@@ -395,3 +395,15 @@ func fieldValuesFromArrayInterface(node []interface{}, fields []string, depth in
 	}
 	return
 }
+
+func (index *Index) calculateShardID(s string) (shardID int) {
+	const Q = 123456789
+
+	result := uint(0)
+	for _, r := range s {
+		result += Q + uint(r*r)
+	}
+	result *= Q
+	shardID = int(result % uint(index.ShardCount))
+	return
+}
