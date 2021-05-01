@@ -23,22 +23,15 @@ const (
 type ProgressCallback func(loadedShardsCount, totalShardsCount int)
 
 // LoadDeferred loads an index metadata only the rest of the data is loaded when needed.
-func LoadDeferred(indexName, baseURL string) (index Index, err error) {
+func LoadDeferred(indexName, baseURL string) (index *Index, err error) {
+	index = New()
 	index.Name = indexName
-	index.LoadedDocumentsShards = map[int]struct{}{}
-	index.LoadedDocumentStatsShards = map[int]struct{}{}
-	index.LoadedTermStatsShards = map[int]struct{}{}
 	index.baseURL = baseURL
 
 	err = index.loadShardCount()
 	if err != nil {
 		return
 	}
-
-	index.FieldNames = make([]string, 0)
-	index.Documents = make(map[string]map[string]interface{})
-	index.DocumentStats = map[string]DocumentStat{}
-	index.TermStats = map[string]TermStat{}
 
 	err = index.loadFieldNamesDeferred()
 	if err != nil {
@@ -90,7 +83,7 @@ func (index *Index) loadFieldNamesFromReader(r io.Reader) (err error) {
 	return
 }
 
-func (index *Index) loadAllShards(progressCallback ProgressCallback, sleepDuration time.Duration) (err error) {
+func (index *Index) LoadAllShards(progressCallback ProgressCallback, sleepDuration time.Duration) (err error) {
 	for i := 0; i < index.ShardCount; i++ {
 		err = index.loadShard(i)
 		if err != nil {

@@ -24,6 +24,12 @@ type Index struct {
 // New creates an empty index.
 func New() (index *Index) {
 	index = &Index{}
+	index.Documents = make(map[string]map[string]interface{})
+	index.DocumentStats = make(map[string]DocumentStat)
+	index.TermStats = make(map[string]TermStat)
+	index.LoadedDocumentStatsShards = make(map[int]struct{})
+	index.LoadedDocumentsShards = make(map[int]struct{})
+	index.LoadedTermStatsShards = make(map[int]struct{})
 	return
 }
 
@@ -72,6 +78,18 @@ type SearchResult struct {
 	Count int
 	Hits  []Hit
 	Time  SearchTime
+}
+
+// SearchOptions contains options that can be used to alter the search operation and result.
+type SearchOptions struct {
+	UseCache bool // Whether to use and/or keep relevant data in memory
+	Size     int  // Number of documents to return
+}
+
+// DefaultSearchOptions returns the default search options.
+var DefaultSearchOptions = SearchOptions{
+	UseCache: true,
+	Size:     10,
 }
 
 // Hit contains metadata of a document such as its ID and score, and also the document iself.
@@ -130,8 +148,25 @@ func (index *Index) Delete(documentID string) (err error) {
 }
 
 // Search searches terms in an index and returns matching documents from the index along with some
-// metadata.
+// metadata. It is equivalent to SearchWithOptions using the default search options.
 func (index *Index) Search(s string) (res SearchResult, err error) {
+	return index.SearchWithOptions(s, DefaultSearchOptions)
+}
+
+// SearchWithOptions searches a term just like Search but it also accepts user-provided SearchOptions.
+func (index *Index) SearchWithOptions(s string, opts SearchOptions) (res SearchResult, err error) {
+	if !opts.UseCache {
+		tmp := New()
+		tmp.Name = index.Name
+		tmp.ShardCount = index.ShardCount
+		tmp.f = index.f
+		tmp.baseURL = index.baseURL
+		return tmp.searchWithOptions(s, opts)
+	}
+	return index.searchWithOptions(s, opts)
+}
+
+func (index *Index) searchWithOptions(s string, opts SearchOptions) (res SearchResult, err error) {
 	var matchedDocumentIDs []string
 	var sortedDocumentIDs []string
 	var scores []float64
@@ -149,7 +184,7 @@ func (index *Index) Search(s string) (res SearchResult, err error) {
 		return
 	}
 
-	res.Hits, err = index.fetchHits(sortedDocumentIDs, scores, 10)
+	res.Hits, err = index.fetchHits(sortedDocumentIDs, scores, opts.Size)
 	if err != nil {
 		return
 	}

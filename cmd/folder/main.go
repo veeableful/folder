@@ -20,7 +20,7 @@ import (
 )
 
 func doIndex(c *cli.Context) (err error) {
-	var index folder.Index
+	var index *folder.Index
 
 	if c.NArg() <= 0 {
 		err = errors.New("please specify the document file or directory path")

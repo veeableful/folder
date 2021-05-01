@@ -27,12 +27,9 @@ const (
 type ProgressCallback func(loadedShardsCount, totalShardsCount int)
 
 // Load loads an index from files
-func Load(indexName string) (index Index, err error) {
+func Load(indexName string) (index *Index, err error) {
+	index = New()
 	index.Name = indexName
-	index.FieldNames = make([]string, 0)
-	index.Documents = make(map[string]map[string]interface{})
-	index.DocumentStats = map[string]DocumentStat{}
-	index.TermStats = map[string]TermStat{}
 
 	err = index.loadFieldNames()
 	if err != nil {
@@ -58,21 +55,14 @@ func Load(indexName string) (index Index, err error) {
 }
 
 // LoadDeferred loads an index metadata only the rest of the data is loaded when needed.
-func LoadDeferred(indexName string) (index Index, err error) {
+func LoadDeferred(indexName string) (index *Index, err error) {
+	index = New()
 	index.Name = indexName
-	index.LoadedDocumentsShards = map[int]struct{}{}
-	index.LoadedDocumentStatsShards = map[int]struct{}{}
-	index.LoadedTermStatsShards = map[int]struct{}{}
 
 	err = index.loadShardCount()
 	if err != nil {
 		return
 	}
-
-	index.FieldNames = make([]string, 0)
-	index.Documents = make(map[string]map[string]interface{})
-	index.DocumentStats = map[string]DocumentStat{}
-	index.TermStats = map[string]TermStat{}
 
 	err = index.loadFieldNamesDeferred()
 	if err != nil {
@@ -83,7 +73,7 @@ func LoadDeferred(indexName string) (index Index, err error) {
 }
 
 func (index *Index) loadShardCount() (err error) {
-	dirPath := fmt.Sprintf("%s", index.Name)
+	dirPath := index.Name
 
 	err = filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, e error) (err error) {
 		if e != nil {
@@ -111,7 +101,7 @@ func (index *Index) loadShardCount() (err error) {
 }
 
 func (index *Index) loadShardCountFS(f fs.FS) (err error) {
-	dirPath := fmt.Sprintf("%s", index.Name)
+	dirPath := index.Name
 
 	err = fs.WalkDir(f, dirPath, func(path string, d fs.DirEntry, e error) (err error) {
 		if e != nil {
@@ -139,12 +129,9 @@ func (index *Index) loadShardCountFS(f fs.FS) (err error) {
 }
 
 // LoadFS loads an index from files using FS
-func LoadFS(f fs.FS, indexName string) (index Index, err error) {
+func LoadFS(f fs.FS, indexName string) (index *Index, err error) {
+	index = New()
 	index.Name = indexName
-	index.FieldNames = make([]string, 0)
-	index.Documents = make(map[string]map[string]interface{})
-	index.DocumentStats = map[string]DocumentStat{}
-	index.TermStats = map[string]TermStat{}
 	index.f = f
 
 	err = index.loadFieldNamesFS(f)
@@ -171,22 +158,15 @@ func LoadFS(f fs.FS, indexName string) (index Index, err error) {
 }
 
 // LoadDeferredFS loads an index metadata only the rest of the data is loaded when needed.
-func LoadDeferredFS(f fs.FS, indexName string) (index Index, err error) {
+func LoadDeferredFS(f fs.FS, indexName string) (index *Index, err error) {
+	index = New()
 	index.Name = indexName
-	index.LoadedDocumentsShards = map[int]struct{}{}
-	index.LoadedDocumentStatsShards = map[int]struct{}{}
-	index.LoadedTermStatsShards = map[int]struct{}{}
 	index.f = f
 
 	err = index.loadShardCountFS(f)
 	if err != nil {
 		return
 	}
-
-	index.FieldNames = make([]string, 0)
-	index.Documents = make(map[string]map[string]interface{})
-	index.DocumentStats = map[string]DocumentStat{}
-	index.TermStats = map[string]TermStat{}
 
 	err = index.loadFieldNamesDeferred()
 	if err != nil {
@@ -197,11 +177,9 @@ func LoadDeferredFS(f fs.FS, indexName string) (index Index, err error) {
 }
 
 // LoadWithProgressFS loads the entire index however user can monitor progress by passing a progress callback and also specify sleep duration between each shard.
-func LoadWithProgressFS(f fs.FS, indexName string, progressCallback ProgressCallback, sleepDuration time.Duration) (index Index, err error) {
+func LoadWithProgressFS(f fs.FS, indexName string, progressCallback ProgressCallback, sleepDuration time.Duration) (index *Index, err error) {
+	index = New()
 	index.Name = indexName
-	index.LoadedDocumentsShards = map[int]struct{}{}
-	index.LoadedDocumentStatsShards = map[int]struct{}{}
-	index.LoadedTermStatsShards = map[int]struct{}{}
 	index.f = f
 
 	err = index.loadShardCountFS(f)
@@ -209,17 +187,12 @@ func LoadWithProgressFS(f fs.FS, indexName string, progressCallback ProgressCall
 		return
 	}
 
-	index.FieldNames = make([]string, 0)
-	index.Documents = make(map[string]map[string]interface{})
-	index.DocumentStats = map[string]DocumentStat{}
-	index.TermStats = map[string]TermStat{}
-
 	err = index.loadFieldNamesDeferred()
 	if err != nil {
 		return
 	}
 
-	err = index.loadAllShards(progressCallback, sleepDuration)
+	err = index.LoadAllShards(progressCallback, sleepDuration)
 	if err != nil {
 		return
 	}
@@ -243,7 +216,7 @@ func (index *Index) loadFieldNames() (err error) {
 func (index *Index) loadFieldNamesDeferred() (err error) {
 	var file fs.File
 
-	dirPath := fmt.Sprintf("%s", index.Name)
+	dirPath := index.Name
 	filePath := fmt.Sprintf("%s/%s", dirPath, FieldNamesFileExtension)
 	if index.f == nil {
 		file, err = os.Open(filePath)
@@ -281,7 +254,7 @@ func (index *Index) loadFieldNamesFromReader(r io.Reader) (err error) {
 	return
 }
 
-func (index *Index) loadAllShards(progressCallback ProgressCallback, sleepDuration time.Duration) (err error) {
+func (index *Index) LoadAllShards(progressCallback ProgressCallback, sleepDuration time.Duration) (err error) {
 	for i := 0; i < index.ShardCount; i++ {
 		err = index.loadDocumentsFromShard(i)
 		if err != nil {
@@ -654,7 +627,7 @@ func (index *Index) SaveToShards(indexName string, shardCount int) (err error) {
 func (index *Index) saveShardCount() (err error) {
 	var file *os.File
 
-	dirPath := fmt.Sprintf("%s", index.Name)
+	dirPath := index.Name
 	err = os.MkdirAll(dirPath, 0700)
 	if err != nil {
 		return
