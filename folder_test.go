@@ -9,7 +9,7 @@ import (
 
 //go:generate sh scripts/setup.sh
 
-var index Index
+var index *Index
 
 func init() {
 	index, _ = Load("index_test")
@@ -40,7 +40,7 @@ func TestIndexAndSearch(t *testing.T) {
 	index.Index(firstDocument)
 	index.Index(secondDocument)
 
-	searchResult := index.Search("chaeyoung search")
+	searchResult, _ := index.Search("chaeyoung search")
 	assert.Equal(t, len(searchResult.Hits), 1)
 	assert.Equal(t, searchResult.Hits[0].Source, firstDocument)
 }
@@ -63,7 +63,7 @@ func TestIndexAndSearchJSONLines(t *testing.T) {
 		},
 	}
 
-	res := index.Search("cooking")
+	res, _ := index.Search("cooking")
 	assert.Equal(t, len(res.Hits), 1)
 	assert.Equal(t, res.Hits[0].Source, expectedResult)
 }
@@ -96,20 +96,20 @@ func TestUpdate(t *testing.T) {
 	}
 
 	// We should be able to find the original document and not find the updated document
-	searchResult := index.Search("chaeyoung search")
+	searchResult, _ := index.Search("chaeyoung search")
 	assert.Equal(t, len(searchResult.Hits), 1)
 	fmt.Printf("%+v\n", searchResult)
 
-	searchResult = index.Search("lilis released")
+	searchResult, _ = index.Search("lilis released")
 	assert.Equal(t, len(searchResult.Hits), 0)
 
 	// After update, we should be able to find the updated document and not find the original document
 	index.Update(documentID, updatedDocument)
 
-	searchResult = index.Search("chaeyoung search")
+	searchResult, _ = index.Search("chaeyoung search")
 	assert.Equal(t, len(searchResult.Hits), 0)
 
-	searchResult = index.Search("lilis released")
+	searchResult, _ = index.Search("lilis released")
 	assert.Equal(t, len(searchResult.Hits), 1)
 	fmt.Printf("%+v\n", searchResult)
 }
