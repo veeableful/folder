@@ -2,6 +2,7 @@ package folder
 
 import (
 	"math/rand"
+	"strings"
 )
 
 const (
@@ -42,4 +43,15 @@ func generateRandomID(n int) string {
 		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
 	}
 	return string(b)
+}
+
+func splitWithRunes(s, runes string) (tokens []string) {
+	s = strings.Map(func(r rune) rune {
+		if strings.ContainsRune(runes, r) {
+			return ' '
+		}
+		return r
+	}, s)
+	tokens = strings.Split(s, " ")
+	return
 }

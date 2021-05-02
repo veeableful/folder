@@ -16,10 +16,14 @@ func init() {
 }
 
 func TestAnalyze(t *testing.T) {
-	expectedResult := []string{"my", "name", "lilis", "iskandar"}
 	index := New()
 	res := index.Analyze("My name is Lilis Iskandar")
-	assert.Equal(t, res, expectedResult)
+	expected := []string{"my", "name", "lilis", "iskandar"}
+	assert.Equal(t, expected, res)
+
+	res = index.Analyze("シェフ、庭師")
+	expected = []string{"シェフ", "庭師"}
+	assert.Equal(t, expected, res)
 }
 func TestIndexAndSearch(t *testing.T) {
 	index := New()
