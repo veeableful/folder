@@ -142,7 +142,7 @@ func (index *Index) Delete(documentID string) (err error) {
 	}
 
 	delete(index.DocumentStats, documentID)
-	index.removeDocumentFromTermStats(documentID, allTokens.List())
+	err = index.removeDocumentFromTermStats(documentID, allTokens.List())
 	return
 }
 
