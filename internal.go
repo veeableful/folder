@@ -134,7 +134,7 @@ func (index *Index) updateDocumentStat(documentID string, tokens []string) (err 
 func (index *Index) fetchDocumentStat(documentID string) (documentStat DocumentStat, ok bool, err error) {
 	documentStat, ok = index.DocumentStats[documentID]
 	if !ok && index.ShardCount > 0 {
-		shardID := index.calculateShardID(documentID)
+		shardID := index.CalculateShardID(documentID)
 		err = index.loadDocumentStatsFromShard(shardID)
 		if err != nil {
 			return
@@ -234,7 +234,7 @@ func (index *Index) findDocuments(tokens []string) (documentIDs []string, elapse
 func (index *Index) fetchTermStat(token string) (termStat TermStat, ok bool, err error) {
 	termStat, ok = index.TermStats[token]
 	if !ok && index.ShardCount > 0 {
-		shardID := index.calculateShardID(token)
+		shardID := index.CalculateShardID(token)
 		err = index.loadTermStatsFromShard(shardID)
 		if err != nil {
 			return
@@ -250,7 +250,7 @@ func (index *Index) sortDocuments(documentIDs []string, tokens []string) (sorted
 
 	scores := make([]float64, len(documentIDs))
 	for i, id := range documentIDs {
-		scores[i], err = index.calculateScore(id, tokens)
+		scores[i], err = index.CalculateScore(id, tokens)
 		if err != nil {
 			return
 		}
@@ -265,7 +265,7 @@ func (index *Index) sortDocuments(documentIDs []string, tokens []string) (sorted
 	return
 }
 
-func (index *Index) calculateScore(documentID string, tokens []string) (score float64, err error) {
+func (index *Index) CalculateScore(documentID string, tokens []string) (score float64, err error) {
 	var tf int
 
 	for _, token := range tokens {
@@ -309,7 +309,7 @@ func (index *Index) fetchHits(documentIDs []string, scores []float64, size int) 
 func (index *Index) fetchDocument(documentID string) (document map[string]interface{}, ok bool, err error) {
 	document, ok = index.Documents[documentID]
 	if !ok && index.ShardCount > 0 {
-		shardID := index.calculateShardID(documentID)
+		shardID := index.CalculateShardID(documentID)
 		err = index.loadDocumentsFromShard(shardID)
 		if err != nil {
 			return
@@ -393,17 +393,5 @@ func fieldValuesFromArrayInterface(node []interface{}, fields []string, depth in
 			values = append(values, fieldValuesFromMapStringInterface(value, fields, depth+1)...)
 		}
 	}
-	return
-}
-
-func (index *Index) calculateShardID(s string) (shardID int) {
-	const Q = 123456789
-
-	result := uint(0)
-	for _, r := range s {
-		result += Q + uint(r*r)
-	}
-	result *= Q
-	shardID = int(result % uint(index.ShardCount))
 	return
 }

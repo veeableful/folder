@@ -208,3 +208,15 @@ func (index *Index) Analyze(s string) (tokens []string) {
 	tokens = StopWordFilter(tokens)
 	return
 }
+
+func (index *Index) CalculateShardID(s string) (shardID int) {
+	const Q = 123456789
+
+	result := uint(0)
+	for _, r := range s {
+		result += Q + uint(r*r)
+	}
+	result *= Q
+	shardID = int(result % uint(index.ShardCount))
+	return
+}

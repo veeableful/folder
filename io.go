@@ -723,7 +723,7 @@ func (index *Index) saveDocumentsToShards() (err error) {
 	headers = append(headers, index.FieldNames...)
 
 	for documentID := range index.Documents {
-		shardID := index.calculateShardID(documentID)
+		shardID := index.CalculateShardID(documentID)
 		shardDocumentIDsMap[shardID] = append(shardDocumentIDsMap[shardID], documentID)
 	}
 
@@ -805,7 +805,7 @@ func (index *Index) saveDocumentStatsToShards() (err error) {
 	shardDocumentIDsMap := make(map[int][]string)
 
 	for documentID := range index.DocumentStats {
-		shardID := index.calculateShardID(documentID)
+		shardID := index.CalculateShardID(documentID)
 		shardDocumentIDsMap[shardID] = append(shardDocumentIDsMap[shardID], documentID)
 	}
 
@@ -836,7 +836,7 @@ func (index *Index) saveDocumentStatsToShards() (err error) {
 			}
 
 			record = append(record, strings.Join(pairs, " "))
-			shardID := index.calculateShardID(documentID)
+			shardID := index.CalculateShardID(documentID)
 			shardDocumentIDsMap[shardID] = append(shardDocumentIDsMap[shardID], documentID)
 			w.Write(record)
 		}
@@ -873,7 +873,7 @@ func (index *Index) saveTermStatsToShards() (err error) {
 	shardTermsMap := make(map[int][]string)
 
 	for term := range index.TermStats {
-		shardID := index.calculateShardID(term)
+		shardID := index.CalculateShardID(term)
 		shardTermsMap[shardID] = append(shardTermsMap[shardID], term)
 	}
 
