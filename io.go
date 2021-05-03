@@ -521,17 +521,9 @@ func (index *Index) loadTermStatsFS(f fs.FS) (err error) {
 }
 
 func (index *Index) loadTermStatsFromReader(r io.Reader) (err error) {
-	csvr := csv.NewReader(r)
-
 	var record []string
-	_, err = csvr.Read()
-	if err != nil {
-		if err == io.EOF {
-			err = nil
-			return
-		}
-		return
-	}
+
+	csvr := csv.NewReader(r)
 
 	for {
 		record, err = csvr.Read()
