@@ -4,8 +4,9 @@ package folder
 
 import (
 	"fmt"
+	"os"
 )
 
 func debug(a ...interface{}) {
-	fmt.Println(a...)
+	fmt.Fprintln(os.Stderr, a...)
 }
