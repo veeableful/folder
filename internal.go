@@ -212,6 +212,9 @@ func (index *Index) findDocuments(tokens []string) (documentIDs []string, elapse
 		if !ok {
 			continue
 		}
+		if err != nil {
+			return
+		}
 
 		for _, id := range termStat.DocumentIDs {
 			ids.Add(id)
