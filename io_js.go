@@ -5,7 +5,6 @@ package folder
 import (
 	"bufio"
 	"encoding/csv"
-	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -33,15 +32,6 @@ func LoadDeferred(indexName, baseURL string) (index *Index, err error) {
 	}
 
 	err = index.loadFieldNamesDeferred()
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (index *Index) loadShardCountFromReader(r io.Reader) (err error) {
-	_, err = fmt.Fscanf(r, "%d", &index.ShardCount)
 	if err != nil {
 		return
 	}
