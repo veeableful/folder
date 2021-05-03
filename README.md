@@ -1,30 +1,84 @@
 # Folder
 
-Folder is a tiny search engine for storing and searching small number of documents. It is compatible with WebAssembly and may be compatible with TinyGo in the future as well. This is a work-in-progress.
+Folder is a search engine that can be embedded into Go programs or web apps via WebAssembly.
 
-## Usage
+## Example
 
 ```go
-// TODO
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/veeableful/folder"
+)
+
+func main() {
+	index := folder.New()
+
+	// Prepare the documents
+	firstDocument := map[string]interface{}{
+		"title": "Folder is a tiny little static search engine",
+		"author": map[string]interface{}{
+			"name": "Chae-Young Song",
+			"hobbies": []string{"drawing", "gaming", "swimming"},
+		},
+	}
+	secondDocument := map[string]interface{}{
+		"title": "Folder v0.1.0 has been released!",
+		"author": map[string]interface{}{
+			"name": "Lilis Iskandar",
+			"hobbies": []string{"cooking", "gardening", "hiking"},
+		},
+	}
+
+	// Index the documents
+	index.Index(firstDocument)
+	index.Index(secondDocument)
+
+	// Save the index to disk
+	err := index.SaveToShards("index", 5)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Load the index from disk
+	index, err = folder.LoadDeferred("index")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Search the index
+	searchResult, err := index.Search("chaeyoung drawing")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Print the search results
+	for _, hit := range searchResult.Hits {
+		fmt.Println(hit.Source)
+	}
+}
 ```
 
 ## File formats
 
 These file formats are not final and may change in the future.
 
-**\[index\].fns**
+**fns**
 
 Newline-separated list of fields. Nested fields are joined together with their parent fields by dots.
 
-**\[index\].dcs**
+**dcs**
 
 Contains the documents in CSV format.
 
-**\[index\].dst**
+**dst**
 
 Contains the document stats in CSV format.
 
-**\[index\].tst**
+**tst**
 
 Contains the term stats in CSV format.
 
@@ -38,7 +92,7 @@ Contains the term stats in CSV format.
 + Short utility functions are located in `util.go`.
 + Scripts are located inside the `scripts` directory.
 + Command-line tool packages such as `folder` are located inside the `cmd` directory.
-+ Assets such as small sample data files are located inside the `assets` directory.
++ Assets such as sample data files are located inside the `assets` directory.
 
 ### Setting up
 
