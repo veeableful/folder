@@ -133,15 +133,17 @@ func (index *Index) updateDocumentStat(documentID string, tokens []string) (err 
 
 func (index *Index) fetchDocumentStat(documentID string) (documentStat DocumentStat, ok bool, err error) {
 	documentStat, ok = index.DocumentStats[documentID]
-	if !ok && index.ShardCount > 0 {
-		shardID := index.CalculateShardID(documentID)
-		err = index.loadDocumentStatsFromShard(shardID)
-		if err != nil {
-			return
-		}
-
-		documentStat, ok = index.DocumentStats[documentID]
+	if ok || index.ShardCount == 0 {
+		return
 	}
+
+	shardID := index.CalculateShardID(documentID)
+	err = index.loadDocumentStatsFromShard(shardID)
+	if err != nil {
+		return
+	}
+
+	documentStat, ok = index.DocumentStats[documentID]
 	return
 }
 
@@ -236,15 +238,17 @@ func (index *Index) findDocuments(tokens []string) (documentIDs []string, elapse
 
 func (index *Index) fetchTermStat(token string) (termStat TermStat, ok bool, err error) {
 	termStat, ok = index.TermStats[token]
-	if !ok && index.ShardCount > 0 {
-		shardID := index.CalculateShardID(token)
-		err = index.loadTermStatsFromShard(shardID)
-		if err != nil {
-			return
-		}
-
-		termStat, ok = index.TermStats[token]
+	if ok || index.ShardCount == 0 {
+		return
 	}
+
+	shardID := index.CalculateShardID(token)
+	err = index.loadTermStatsFromShard(shardID)
+	if err != nil {
+		return
+	}
+
+	termStat, ok = index.TermStats[token]
 	return
 }
 
@@ -311,15 +315,17 @@ func (index *Index) fetchHits(documentIDs []string, scores []float64, size int) 
 
 func (index *Index) fetchDocument(documentID string) (document map[string]interface{}, ok bool, err error) {
 	document, ok = index.Documents[documentID]
-	if !ok && index.ShardCount > 0 {
-		shardID := index.CalculateShardID(documentID)
-		err = index.loadDocumentsFromShard(shardID)
-		if err != nil {
-			return
-		}
-
-		document, ok = index.Documents[documentID]
+	if ok || index.ShardCount == 0 {
+		return
 	}
+
+	shardID := index.CalculateShardID(documentID)
+	err = index.loadDocumentsFromShard(shardID)
+	if err != nil {
+		return
+	}
+
+	document, ok = index.Documents[documentID]
 	return
 }
 
