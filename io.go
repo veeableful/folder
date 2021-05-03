@@ -73,30 +73,16 @@ func LoadDeferred(indexName string) (index *Index, err error) {
 }
 
 func (index *Index) loadShardCount() (err error) {
-	dirPath := index.Name
+	var file *os.File
 
-	err = filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, e error) (err error) {
-		if e != nil {
-			err = e
-			return
-		}
-
-		if !d.IsDir() {
-			return
-		}
-
-		shardID := -1
-		fmt.Sscanf(filepath.Base(path), "%d", &shardID)
-		if shardID < 0 {
-			return
-		}
-
-		index.ShardCount += 1
-		return
-	})
+	url := fmt.Sprintf("%s/shard_count", index.Name)
+	file, err = os.Open(url)
 	if err != nil {
 		return
 	}
+	defer file.Close()
+
+	err = index.loadShardCountFromReader(file)
 	return
 }
 
