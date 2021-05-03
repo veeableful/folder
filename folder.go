@@ -124,6 +124,7 @@ func (index *Index) Update(documentID string, document map[string]interface{}) (
 	}
 
 	index.Documents[documentID] = document
+
 	err = index.index(documentID, document)
 	if err != nil {
 		return
@@ -137,6 +138,8 @@ func (index *Index) Delete(documentID string) (err error) {
 	if !ok {
 		return
 	}
+
+	debug("Delete", documentID)
 
 	m := make(map[string][]string)
 	index.analyze("", document, m)
@@ -162,6 +165,7 @@ func (index *Index) Search(s string) (res SearchResult, err error) {
 // SearchWithOptions searches a term just like Search but it also accepts user-provided SearchOptions.
 func (index *Index) SearchWithOptions(s string, opts SearchOptions) (res SearchResult, err error) {
 	if !opts.UseCache {
+		debug("Search", s, "(not cached)")
 		tmp := New()
 		tmp.Name = index.Name
 		tmp.ShardCount = index.ShardCount
@@ -169,6 +173,7 @@ func (index *Index) SearchWithOptions(s string, opts SearchOptions) (res SearchR
 		tmp.baseURL = index.baseURL
 		return tmp.searchWithOptions(s, opts)
 	}
+	debug("Search", s, "(cached)")
 	return index.searchWithOptions(s, opts)
 }
 
@@ -179,6 +184,7 @@ func (index *Index) searchWithOptions(s string, opts SearchOptions) (res SearchR
 
 	startTime := time.Now()
 	tokens := index.Analyze(s)
+	debug("  Analyzed", s, "into", tokens)
 
 	matchedDocumentIDs, res.Time.Match, err = index.findDocuments(tokens)
 	if err != nil {

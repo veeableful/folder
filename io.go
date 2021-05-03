@@ -284,7 +284,7 @@ func (index *Index) loadDocumentsFromShard(shardID int) (err error) {
 	}
 
 	filePath := fmt.Sprintf("%s/%d/%s", index.Name, shardID, DocumentsFileExtension)
-	debug("Loading documents shard: ", filePath)
+	debug("  Loading documents shard: ", filePath)
 
 	if index.f == nil {
 		file, err = os.Open(filePath)
@@ -386,7 +386,7 @@ func (index *Index) loadDocumentStatsFromShard(shardID int) (err error) {
 	}
 
 	filePath := fmt.Sprintf("%s/%d/%s", index.Name, shardID, DocumentStatsFileExtension)
-	debug("Loading document stats shard:", filePath)
+	debug("  Loading document stats shard:", filePath)
 
 	if index.f == nil {
 		file, err = os.Open(filePath)
@@ -485,7 +485,7 @@ func (index *Index) loadTermStatsFromShard(shardID int) (err error) {
 	}
 
 	filePath := fmt.Sprintf("%s/%d/%s", index.Name, shardID, TermStatsFileExtension)
-	debug("Loading term stats shard: ", filePath)
+	debug("  Loading term stats shard: ", filePath)
 
 	if index.f == nil {
 		file, err = os.Open(filePath)

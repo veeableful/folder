@@ -44,6 +44,9 @@ func (index *Index) analyze(parentField string, v interface{}, m map[string][]st
 
 	switch value := v.(type) {
 	case map[string]interface{}:
+		if len(parentField) > 0 {
+			debug("  Analyze field " + parentField + ": map[string]interface{}")
+		}
 		for field, value := range value {
 			if parentField != "" {
 				field = parentField + "." + field
@@ -51,24 +54,29 @@ func (index *Index) analyze(parentField string, v interface{}, m map[string][]st
 			index.analyze(field, value, m)
 		}
 	case []map[string]interface{}:
+		debug("  Analyze field " + parentField + ": []map[string]interface{}")
 		for _, v := range value {
 			index.analyze(parentField, v, m)
 		}
 	case []interface{}:
+		debug("  Analyze field " + parentField + ": []interface{}")
 		for _, v := range value {
 			index.analyze(parentField, v, m)
 		}
 	case []string:
+		debug("  Analyze field " + parentField + ": []string")
 		tokens := []string{}
 		for _, v := range value {
 			tokens = append(tokens, index.Analyze(v)...)
 		}
 		m[parentField] = append(m[parentField], tokens...)
 	case *string:
+		debug("  Analyze field " + parentField + ": *string")
 		if value != nil {
 			m[parentField] = append(m[parentField], index.Analyze(*value)...)
 		}
 	case string:
+		debug("  Analyze field " + parentField + ": string")
 		m[parentField] = append(m[parentField], index.Analyze(value)...)
 	case int:
 		// TODO
@@ -76,9 +84,11 @@ func (index *Index) analyze(parentField string, v interface{}, m map[string][]st
 }
 
 func (index *Index) index(documentID string, document map[string]interface{}) (err error) {
+	debug("Index", documentID)
 	m := make(map[string][]string)
 	index.analyze("", document, m)
 	for field, tokens := range m {
+		debug("  Index field", field)
 		index.indexTokens(documentID, field, tokens)
 	}
 	return
@@ -98,12 +108,15 @@ func (index *Index) indexTokens(documentID string, field string, tokens []string
 		return
 	}
 
+	debug("  Add new field name", field)
 	index.FieldNames = append(index.FieldNames, field)
 	return
 }
 
 func (index *Index) updateDocumentStat(documentID string, tokens []string) (err error) {
 	var documentStat DocumentStat
+
+	debug("  Update document stat in", documentID, "for tokens", tokens)
 
 	if index.DocumentStats == nil {
 		index.DocumentStats = make(map[string]DocumentStat)
@@ -151,6 +164,8 @@ func (index *Index) updateTermStat(documentID string, tokens []string) (err erro
 	var termStat TermStat
 	var ok bool
 
+	debug("  Update term stat in", documentID, "for tokens", tokens)
+
 	if index.TermStats == nil {
 		index.TermStats = make(map[string]TermStat)
 	}
@@ -179,6 +194,8 @@ func (index *Index) removeDocumentFromTermStats(documentID string, tokens []stri
 	var termStat TermStat
 	var ok bool
 
+	debug("  Remove document ID", documentID, "from term stats with tokens", tokens)
+
 	for _, token := range tokens {
 		termStat, ok, err = index.fetchTermStat(token)
 		if err != nil {
@@ -206,6 +223,7 @@ func (index *Index) findDocuments(tokens []string) (documentIDs []string, elapse
 	var ok bool
 
 	startTime := time.Now()
+	debug("  Find document IDs with tokens", tokens)
 
 	for _, token := range tokens {
 		ids := MakeStringSet([]string{})
@@ -255,6 +273,8 @@ func (index *Index) fetchTermStat(token string) (termStat TermStat, ok bool, err
 func (index *Index) sortDocuments(documentIDs []string, tokens []string) (sortedDocumentIDs []string, sortedScores []float64, elapsedTime time.Duration, err error) {
 	startTime := time.Now()
 
+	debug("  Sort", len(documentIDs), "documents with tokens", tokens)
+
 	scores := make([]float64, len(documentIDs))
 	for i, id := range documentIDs {
 		scores[i], err = index.CalculateScore(id, tokens)
@@ -293,6 +313,12 @@ func (index *Index) fetchHits(documentIDs []string, scores []float64, size int) 
 	if size == 0 {
 		return
 	}
+
+	n := len(documentIDs)
+	if n > size {
+		n = size
+	}
+	debug("  Fetch", n, "documents")
 
 	hits = make([]Hit, 0)
 	for i, documentID := range documentIDs {
