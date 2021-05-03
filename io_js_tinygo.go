@@ -75,9 +75,9 @@ func (index *Index) loadDocumentsFromShard(shardID int) (err error) {
 		return
 	}
 
-	debug("Loading documents shard", shardID)
-
 	url := fmt.Sprintf("%s/%s/%d/%s", index.baseURL, index.Name, shardID, DocumentsFileExtension)
+	debug("  Loading documents shard:", url)
+
 	r, err = textReaderFromURL(url)
 	if err != nil {
 		return
@@ -100,9 +100,9 @@ func (index *Index) loadDocumentStatsFromShard(shardID int) (err error) {
 		return
 	}
 
-	debug("Loading document stats shard", shardID)
-
 	url := fmt.Sprintf("%s/%s/%d/%s", index.baseURL, index.Name, shardID, DocumentStatsFileExtension)
+	debug("  Loading document stats shard:", url)
+
 	r, err = textReaderFromURL(url)
 	if err != nil {
 		return
@@ -125,9 +125,9 @@ func (index *Index) loadTermStatsFromShard(shardID int) (err error) {
 		return
 	}
 
-	debug("Loading term stats shard", shardID)
-
 	url := fmt.Sprintf("%s/%s/%d/%s", index.baseURL, index.Name, shardID, TermStatsFileExtension)
+	debug("  Loading term stats shard:", url)
+
 	r, err = textReaderFromURL(url)
 	if err != nil {
 		return
