@@ -98,6 +98,13 @@ type Hit struct {
 	Source map[string]interface{}
 }
 
+// IndexWithID indexes a document into the index but with user-specified document ID.
+func (index *Index) IndexWithID(document map[string]interface{}, desiredDocumentID string) (documentID string, err error) {
+	documentID = desiredDocumentID
+	err = index.Update(documentID, document)
+	return
+}
+
 // Index indexes a document into the index.
 func (index *Index) Index(document map[string]interface{}) (documentID string, err error) {
 	documentID = index.nextDocumentID()

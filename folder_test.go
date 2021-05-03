@@ -25,6 +25,30 @@ func TestAnalyze(t *testing.T) {
 	expected = []string{"シェフ", "庭師"}
 	assert.Equal(t, expected, res)
 }
+func TestIndexWithIDAndSearch(t *testing.T) {
+	index := New()
+
+	firstDocument := map[string]interface{}{
+		"title": "Folder is a tiny little static search engine",
+		"author": map[string]interface{}{
+			"name": "Chae-Young Song",
+		},
+	}
+	secondDocument := map[string]interface{}{
+		"title": "Folder v0.1.0 has been released!",
+		"author": map[string]interface{}{
+			"name": "Lilis Iskandar",
+		},
+	}
+
+	index.IndexWithID(firstDocument, "1")
+	index.IndexWithID(secondDocument, "2")
+
+	searchResult, _ := index.Search("chaeyoung search")
+	assert.Equal(t, len(searchResult.Hits), 1)
+	assert.Equal(t, searchResult.Hits[0].Source, firstDocument)
+	assert.Equal(t, searchResult.Hits[0].ID, "1")
+}
 func TestIndexAndSearch(t *testing.T) {
 	index := New()
 
