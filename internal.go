@@ -63,13 +63,13 @@ func (index *Index) analyze(parentField string, v interface{}, m map[string][]st
 		for _, v := range value {
 			tokens = append(tokens, index.Analyze(v)...)
 		}
-		m[parentField] = tokens
+		m[parentField] = append(m[parentField], tokens...)
 	case *string:
 		if value != nil {
-			m[parentField] = index.Analyze(*value)
+			m[parentField] = append(m[parentField], index.Analyze(*value)...)
 		}
 	case string:
-		m[parentField] = index.Analyze(value)
+		m[parentField] = append(m[parentField], index.Analyze(value)...)
 	case int:
 		// TODO
 	}
