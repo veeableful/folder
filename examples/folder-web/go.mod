@@ -2,4 +2,4 @@ module folder-web
 
 go 1.16
 
-require github.com/veeableful/folder v0.0.0-20210503073635-e1e295b941b0
+require github.com/veeableful/folder v0.0.0-20210508070016-359b6665094f
