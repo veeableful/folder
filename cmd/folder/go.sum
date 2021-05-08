@@ -19,8 +19,6 @@ github.com/stretchr/testify v1.7.0 h1:nwc3DEeHmmLAfoZucVR881uASk0Mfjw8xYJ99tb5Cc
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/urfave/cli/v2 v2.3.0 h1:qph92Y649prgesehzOrQjdWyxFOp/QVM+6imKHad91M=
 github.com/urfave/cli/v2 v2.3.0/go.mod h1:LJmUH05zAU44vOAcrfzZQKsZbVcdbOG8rtL3/XcUArI=
-github.com/veeableful/folder v0.0.0-20210508062743-3618a237ee50 h1:3kl/eWmO82SWY7Upva3pLgaJuUeEHKj1B6SyJBA0XaE=
-github.com/veeableful/folder v0.0.0-20210508062743-3618a237ee50/go.mod h1:cEbPl99bI42PkUKJDm8GZxvOxTULnbQyts7HFE+GViM=
 github.com/veeableful/folder v0.0.0-20210508065513-0e69e3c6d658 h1:Gv1nQekotbFoqqH5H7lX+RJC1EAV6j86B4hHrpFgwqk=
 github.com/veeableful/folder v0.0.0-20210508065513-0e69e3c6d658/go.mod h1:cEbPl99bI42PkUKJDm8GZxvOxTULnbQyts7HFE+GViM=
 golang.org/x/sys v0.0.0-20191026070338-33540a1f6037/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
