@@ -9,6 +9,31 @@ import (
 	"time"
 )
 
+// IDScores is a structure used for sorting document IDs using their respective scores.
+type IDScores struct {
+	IDs    sort.StringSlice
+	Scores sort.Float64Slice
+}
+
+// Len returns the number of document IDs.
+func (ids IDScores) Len() int {
+	return len(ids.IDs)
+}
+
+// Less compares the scores between two documents.
+func (ids IDScores) Less(i, j int) bool {
+	if ids.Scores[i] == ids.Scores[j] {
+		return !ids.IDs.Less(i, j) // Put document IDs with "lower" values higher in the list
+	}
+	return ids.Scores.Less(i, j)
+}
+
+// Swap swaps two documents and their respective scores in the arrays.
+func (ids IDScores) Swap(i, j int) {
+	ids.Scores[i], ids.Scores[j] = ids.Scores[j], ids.Scores[i]
+	ids.IDs[i], ids.IDs[j] = ids.IDs[j], ids.IDs[i]
+}
+
 // setField sets a value in a document at a field path
 // e.g. setField(doc, "author.name", "Lilis Iskandar")
 func setField(document map[string]interface{}, fieldPath, record string) {

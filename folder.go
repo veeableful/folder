@@ -42,28 +42,6 @@ type TermStat struct {
 	DocumentIDs []string
 }
 
-// IDScores is a structure used for sorting document IDs using their respective scores.
-type IDScores struct {
-	IDs    []string
-	Scores []float64
-}
-
-// Len returns the number of document IDs.
-func (ids IDScores) Len() int {
-	return len(ids.IDs)
-}
-
-// Less compares the scores between two documents.
-func (ids IDScores) Less(i, j int) bool {
-	return ids.Scores[i] < ids.Scores[j]
-}
-
-// Swap swaps two documents and their respective scores in the arrays.
-func (ids IDScores) Swap(i, j int) {
-	ids.Scores[i], ids.Scores[j] = ids.Scores[j], ids.Scores[i]
-	ids.IDs[i], ids.IDs[j] = ids.IDs[j], ids.IDs[i]
-}
-
 // SearchTime contains the elapsed times during various stages in the search process.
 type SearchTime struct {
 	Match time.Duration

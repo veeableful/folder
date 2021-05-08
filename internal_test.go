@@ -1,6 +1,7 @@
 package folder
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -65,4 +66,17 @@ func TestInternalAnalyze(t *testing.T) {
 	index := New()
 	index.analyze("", testDocument, m)
 	assert.Equal(t, m, expectedResult)
+}
+
+func TestIDScoresSort(t *testing.T) {
+	v := IDScores{
+		IDs:    sort.StringSlice{"2", "1"},
+		Scores: sort.Float64Slice{1.0, 1.0},
+	}
+	expected := IDScores{
+		IDs:    sort.StringSlice{"1", "2"},
+		Scores: sort.Float64Slice{1.0, 1.0},
+	}
+	sort.Sort(sort.Reverse(v))
+	assert.Equal(t, expected, v)
 }
