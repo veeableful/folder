@@ -50,6 +50,7 @@ func TestValueFromMapStringInterface(t *testing.T) {
 	assert.Equal(t, fieldValuesFromRoot(testDocument, "project"), []string{"Folder"})
 	assert.Equal(t, fieldValuesFromRoot(testDocument, "author.name"), []string{"Lilis Iskandar"})
 	assert.Equal(t, fieldValuesFromRoot(testDocument, "author.coworkers.name"), []string{"Chae-Young Song"})
+	assert.Equal(t, fieldValuesFromRoot(testDocument, "author.details.age"), []string{"28"})
 }
 
 func TestInternalAnalyze(t *testing.T) {

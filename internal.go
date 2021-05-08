@@ -2,7 +2,9 @@ package folder
 
 import (
 	"math"
+	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -409,6 +411,12 @@ func fieldValuesFromMapStringInterface(document map[string]interface{}, fields [
 		}
 	case map[string]interface{}:
 		values = append(values, fieldValuesFromMapStringInterface(t, fields, depth+1)...)
+	case float64:
+		values = append(values, strconv.FormatFloat(t, 'g', 'g', 64))
+	case int:
+		values = append(values, strconv.FormatInt(int64(t), 10))
+	default:
+		debug("fieldValuesFromMapStringInterface(): Unimplemented for", reflect.TypeOf(t))
 	}
 	return
 }
@@ -426,6 +434,8 @@ func fieldValuesFromArrayInterface(node []interface{}, fields []string, depth in
 			values = append(values, fieldValuesFromArrayInterface(value, fields, depth)...)
 		case map[string]interface{}:
 			values = append(values, fieldValuesFromMapStringInterface(value, fields, depth+1)...)
+		default:
+			debug("fieldValuesFromArrayInterface(): Unimplemented for", reflect.TypeOf(value))
 		}
 	}
 	return
