@@ -25,6 +25,7 @@ func TestAnalyze(t *testing.T) {
 	expected = []string{"シェフ", "庭師"}
 	assert.Equal(t, expected, res)
 }
+
 func TestIndexWithIDAndSearch(t *testing.T) {
 	index := New()
 
@@ -49,6 +50,7 @@ func TestIndexWithIDAndSearch(t *testing.T) {
 	assert.Equal(t, searchResult.Hits[0].Source, firstDocument)
 	assert.Equal(t, searchResult.Hits[0].ID, "1")
 }
+
 func TestIndexAndSearch(t *testing.T) {
 	index := New()
 
