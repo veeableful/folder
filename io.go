@@ -793,6 +793,22 @@ func (index *Index) IndexFilePath(filePath, dataType string) (err error) {
 	return
 }
 
+// IndexFilePathWithIDField performs similar operation as IndexFilePath but user can provide which
+// document field value to be used as the document ID. This is only compatible with "json" and "jsonl"
+// data types.
+func (index *Index) IndexFilePathWithIDField(filePath, dataType, idField string) (err error) {
+	var file *os.File
+
+	file, err = os.Open(filePath)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	err = index.IndexReaderWithIDField(file, dataType, idField)
+	return
+}
+
 // IndexReader indexes a reader and assumes a certain data type such as text, JSON, or JSONL.
 func (index *Index) IndexReader(r io.Reader, dataType string) (err error) {
 	var data []byte
@@ -803,5 +819,20 @@ func (index *Index) IndexReader(r io.Reader, dataType string) (err error) {
 	}
 
 	err = index.IndexData(data, dataType)
+	return
+}
+
+// IndexReaderWithIDField performs similar operation as IndexReader but user can provide which
+// document field value to be used as the document ID. This is only compatible with "json" and "jsonl"
+// data types.
+func (index *Index) IndexReaderWithIDField(r io.Reader, dataType, idField string) (err error) {
+	var data []byte
+
+	data, err = ioutil.ReadAll(r)
+	if err != nil {
+		return
+	}
+
+	err = index.IndexDataWithIDField(data, dataType, idField)
 	return
 }
