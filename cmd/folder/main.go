@@ -31,6 +31,7 @@ func doIndex(c *cli.Context) (err error) {
 	dataType := c.String("type")
 	pluginName := c.String("plugin")
 	indexName := c.String("index")
+	idField := c.String("id-field")
 
 	var info os.FileInfo
 	info, err = os.Stat(filePath)
@@ -67,14 +68,32 @@ func doIndex(c *cli.Context) (err error) {
 			return
 		}
 
-		index.IndexData(data, dataType)
+		if idField != "" {
+			err = index.IndexDataWithIDField(data, dataType, idField)
+			if err != nil {
+				return
+			}
+		} else {
+			err = index.IndexData(data, dataType)
+			if err != nil {
+				return
+			}
+		}
 	} else {
 		if info.IsDir() {
 			err = filepath.WalkDir(filePath, func(path string, d os.DirEntry, err error) error {
-				return index.IndexFilePath(path, dataType)
+				if idField != "" {
+					return index.IndexFilePathWithIDField(path, dataType, idField)
+				} else {
+					return index.IndexFilePath(path, dataType)
+				}
 			})
 		} else {
-			err = index.IndexFilePath(filePath, dataType)
+			if idField != "" {
+				err = index.IndexFilePathWithIDField(filePath, dataType, idField)
+			} else {
+				err = index.IndexFilePath(filePath, dataType)
+			}
 		}
 		if err != nil {
 			return err
@@ -147,6 +166,11 @@ func main() {
 						Name:  "shards",
 						Usage: "Number of shards",
 						Value: 1000,
+					},
+					&cli.StringFlag{
+						Name:  "id-field",
+						Usage: "Field to be used for document ID",
+						Value: "",
 					},
 				},
 			},
