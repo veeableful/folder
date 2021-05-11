@@ -46,6 +46,7 @@ func jsLoad() js.Func {
 
 				jsIndex := js.ValueOf(map[string]interface{}{
 					"search":     jsSearch(index),
+					"fetch":      jsFetch(index),
 					"shardCount": js.ValueOf(index.ShardCount),
 				})
 				resolve.Invoke(jsIndex)
@@ -79,6 +80,31 @@ func jsSearch(index *folder.Index) js.Func {
 					return
 				}
 				resolve.Invoke(jsSearchResultValue(result))
+			}()
+			return nil
+		})
+
+		promiseConstructor := js.Global().Get("Promise")
+		return promiseConstructor.New(handler)
+	})
+}
+
+func jsFetch(index *folder.Index) js.Func {
+	return js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		documentID := args[0].String()
+
+		handler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			resolve := args[0]
+			reject := args[1]
+			go func() {
+				document, err := index.Fetch(documentID)
+				if err != nil {
+					errorConstructor := js.Global().Get("Error")
+					errorObject := errorConstructor.New(err.Error())
+					reject.Invoke(errorObject)
+					return
+				}
+				resolve.Invoke(js.ValueOf(document))
 			}()
 			return nil
 		})
