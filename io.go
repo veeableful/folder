@@ -266,6 +266,34 @@ func (index *Index) loadDocuments() (err error) {
 	return
 }
 
+func (index *Index) fetchDocumentFromShard(shardID int, documentID string) (document map[string]interface{}, err error) {
+	var file fs.File
+
+	if _, ok := index.LoadedDocumentsShards[shardID]; ok {
+		return
+	}
+
+	filePath := fmt.Sprintf("%s/%d/%s", index.Name, shardID, DocumentsFileExtension)
+	debug("  Fetching document from shard: ", filePath)
+
+	if index.f == nil {
+		file, err = os.Open(filePath)
+	} else {
+		file, err = index.f.Open(filePath)
+	}
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	document, err = index.fetchDocumentFromReader(file, documentID)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 func (index *Index) loadDocumentsFromShard(shardID int) (err error) {
 	var file fs.File
 

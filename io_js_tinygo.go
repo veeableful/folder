@@ -68,6 +68,30 @@ func (index *Index) loadFieldNamesDeferred() (err error) {
 	return
 }
 
+func (index *Index) fetchDocumentFromShard(shardID int, documentID string) (document map[string]interface{}, err error) {
+	var r io.Reader
+	var ok bool
+
+	if document, ok = index.Documents[documentID]; ok {
+		return
+	}
+
+	url := fmt.Sprintf("%s/%s/%d/%s", index.baseURL, index.Name, shardID, DocumentsFileExtension)
+	debug("  Fetching document from shard: ", url)
+
+	r, err = textReaderFromURL(url)
+	if err != nil {
+		return
+	}
+
+	document, err = index.fetchDocumentFromReader(r, documentID)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 func (index *Index) loadDocumentsFromShard(shardID int) (err error) {
 	var r io.Reader
 

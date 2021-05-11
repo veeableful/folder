@@ -36,6 +36,31 @@ func (index *Index) loadFieldNamesDeferred() (err error) {
 	return
 }
 
+func (index *Index) fetchDocumentFromShard(shardID int, documentID string) (document map[string]interface{}, err error) {
+	var resp *http.Response
+	var ok bool
+
+	if document, ok = index.Documents[documentID]; ok {
+		return
+	}
+
+	url := fmt.Sprintf("%s/%s/%d/%s", index.baseURL, index.Name, shardID, DocumentsFileExtension)
+	debug("  Fetching document from shard: ", url)
+
+	resp, err = http.Get(url)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	document, err = index.fetchDocumentFromReader(resp.Body, documentID)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 func (index *Index) loadDocumentsFromShard(shardID int) (err error) {
 	var resp *http.Response
 

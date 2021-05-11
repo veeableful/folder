@@ -27,6 +27,40 @@ func (index *Index) loadFieldNamesFromReader(r io.Reader) (err error) {
 	return
 }
 
+func (index *Index) fetchDocumentFromReader(r io.Reader, documentID string) (document map[string]interface{}, err error) {
+	csvr := csv.NewReader(r)
+
+	var record []string
+	record, err = csvr.Read()
+	if err != nil {
+		if err == io.EOF {
+			err = nil
+			return
+		}
+		return
+	}
+
+	headers := record
+
+	for {
+		record, err = csvr.Read()
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+				break
+			}
+			return
+		}
+
+		id := record[0]
+		if id == documentID {
+			document = documentFromRecord(headers[1:], record[1:])
+			return
+		}
+	}
+	return
+}
+
 func (index *Index) loadDocumentsFromReader(r io.Reader) (err error) {
 	csvr := csv.NewReader(r)
 

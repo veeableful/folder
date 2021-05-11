@@ -134,6 +134,13 @@ func (index *Index) Delete(documentID string) (err error) {
 	return
 }
 
+// Fetch fetches a document with specific ID.
+func (index *Index) Fetch(documentID string) (document map[string]interface{}, err error) {
+	shardID := index.CalculateShardID(documentID)
+	document, err = index.fetchDocumentFromShard(shardID, documentID)
+	return
+}
+
 // Search searches terms in an index and returns matching documents from the index along with some
 // metadata. It is equivalent to SearchWithOptions using the default search options.
 func (index *Index) Search(s string) (res SearchResult, err error) {
