@@ -137,6 +137,30 @@ func doSearch(c *cli.Context) error {
 	return nil
 }
 
+func doFetch(c *cli.Context) error {
+	indexName := c.String("index")
+	format := c.String("format")
+
+	index, err := folder.LoadDeferred(indexName)
+	if err != nil {
+		return err
+	}
+
+	documentID := c.Args().First()
+	document, err := index.Fetch(documentID) // Load related shards to memory first
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if format == "go" {
+		fmt.Printf("%+v\n", document)
+	} else if format == "json" {
+		data, _ := json.Marshal(document)
+		fmt.Printf("%s\n", string(data))
+	}
+	return nil
+}
+
 func main() {
 	app := &cli.App{
 		Name:  "folder",
@@ -183,6 +207,24 @@ func main() {
 					&cli.StringFlag{
 						Name:  "format",
 						Usage: "Format of the search result output [go, json]",
+						Value: "go",
+					},
+					&cli.StringFlag{
+						Name:  "index",
+						Usage: "Name of the index",
+						Value: "index",
+					},
+				},
+			},
+			{
+				Name:    "fetch",
+				Aliases: []string{"s"},
+				Usage:   "Fetch a document with specific ID",
+				Action:  doFetch,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "format",
+						Usage: "Format of the fetch output [go, json]",
 						Value: "go",
 					},
 					&cli.StringFlag{
