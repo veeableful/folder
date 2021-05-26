@@ -61,12 +61,14 @@ type SearchResult struct {
 type SearchOptions struct {
 	UseCache bool // Whether to use and/or keep relevant data in memory
 	Size     int  // Number of documents to return
+	From     int  // Starting offset for returned documents
 }
 
 // DefaultSearchOptions returns the default search options.
 var DefaultSearchOptions = SearchOptions{
 	UseCache: true,
 	Size:     10,
+	From:     0,
 }
 
 // Hit contains metadata of a document such as its ID and score, and also the document iself.
@@ -181,7 +183,7 @@ func (index *Index) searchWithOptions(s string, opts SearchOptions) (res SearchR
 		return
 	}
 
-	res.Hits, err = index.fetchHits(sortedDocumentIDs, scores, opts.Size)
+	res.Hits, err = index.fetchHits(sortedDocumentIDs, scores, opts.Size, opts.From)
 	if err != nil {
 		return
 	}

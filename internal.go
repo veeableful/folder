@@ -334,21 +334,24 @@ func (index *Index) CalculateScore(documentID string, tokens []string) (score fl
 	return
 }
 
-func (index *Index) fetchHits(documentIDs []string, scores []float64, size int) (hits []Hit, err error) {
+func (index *Index) fetchHits(documentIDs []string, scores []float64, size, from int) (hits []Hit, err error) {
 	var document map[string]interface{}
 
-	if size == 0 {
-		return
+	if from < 0 {
+		from = 0
 	}
 
 	n := len(documentIDs)
+	if size == 0 || from >= n {
+		return
+	}
 	if n > size {
 		n = size
 	}
 	debug("  Fetch", n, "documents")
 
 	hits = make([]Hit, 0)
-	for i, documentID := range documentIDs {
+	for i, documentID := range documentIDs[from : from+n] {
 		document, _, err = index.fetchDocument(documentID)
 		if err != nil {
 			return
@@ -356,12 +359,9 @@ func (index *Index) fetchHits(documentIDs []string, scores []float64, size int) 
 
 		hits = append(hits, Hit{
 			ID:     documentID,
-			Score:  scores[i],
+			Score:  scores[from+i],
 			Source: document,
 		})
-		if len(hits) >= size {
-			break
-		}
 	}
 	return
 }
