@@ -160,11 +160,6 @@ func (index *Index) updateDocumentStat(documentID string, tokens []string) (err 
 		} else {
 			documentStat.TermFrequency[token] += 1
 		}
-		if documentStat.TermFrequency == nil {
-			documentStat.TermFrequency = map[string]int{token: 1}
-		} else {
-			documentStat.TermFrequency[token] += 1
-		}
 	}
 
 	index.DocumentStats[documentID] = documentStat
