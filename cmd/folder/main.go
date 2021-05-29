@@ -110,6 +110,9 @@ func doIndex(c *cli.Context) (err error) {
 
 func doSearch(c *cli.Context) error {
 	indexName := c.String("index")
+	format := c.String("format")
+	size := c.Int("size")
+	from := c.Int("from")
 
 	index, err := folder.LoadDeferred(indexName)
 	if err != nil {
@@ -117,13 +120,14 @@ func doSearch(c *cli.Context) error {
 	}
 
 	s := c.Args().First()
-	format := c.String("format")
-	result, err := index.Search(s) // Load related shards to memory first
+	opts := folder.DefaultSearchOptions
+	opts.From = from
+	opts.Size = size
+	result, err := index.SearchWithOptions(s, opts)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	result, err = index.Search(s)
+	result, err = index.SearchWithOptions(s, opts)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -213,6 +217,16 @@ func main() {
 						Name:  "index",
 						Usage: "Name of the index",
 						Value: "index",
+					},
+					&cli.IntFlag{
+						Name:  "size",
+						Usage: "Max number of documents to document",
+						Value: 10,
+					},
+					&cli.IntFlag{
+						Name:  "from",
+						Usage: "Starting offset of documents",
+						Value: 0,
 					},
 				},
 			},
