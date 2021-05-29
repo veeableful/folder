@@ -202,14 +202,14 @@ func (index *Index) Analyze(s string) (tokens []string) {
 	return
 }
 
-func (index *Index) CalculateShardID(s string) (shardID int) {
+func (index *Index) CalculateShardID(s string) (shardID uint32) {
 	const Q = 123456789
 
-	result := uint(0)
+	result := uint32(0)
 	for _, r := range s {
-		result += Q + uint(r*r)
+		result += Q + uint32(r)*uint32(r)
 	}
 	result *= Q
-	shardID = int(result % uint(index.ShardCount))
+	shardID = uint32(result % uint32(index.ShardCount))
 	return
 }
