@@ -239,6 +239,7 @@ func (index *Index) nextDocumentID() (id string) {
 	return
 }
 
+// findDocuments finds document IDs which contain the tokens. The more tokens provided, the fewer number of documents would be found as they are narrowed down.
 func (index *Index) findDocuments(tokens []string) (documentIDs []string, elapsedTime time.Duration, err error) {
 	var documentIDsSet StringSet
 	var termStat TermStat
