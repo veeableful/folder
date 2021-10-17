@@ -195,7 +195,7 @@ func (index *Index) searchWithOptions(s string, opts SearchOptions) (res SearchR
 
 // AnalyzeString breaks down string into list of tokens with some metadata such positions.
 func (index *Index) Analyze(s string) (tokens []string) {
-	tokens = splitWithRunes(s, "、,　 ")
+	tokens = splitWithRunes(s, ",、　 ​")
 	tokens = LowercaseFilter(tokens)
 	tokens = PunctuationFilter(tokens)
 	tokens = StopWordFilter(tokens)
