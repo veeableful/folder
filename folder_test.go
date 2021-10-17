@@ -12,7 +12,7 @@ import (
 var index *Index
 
 func init() {
-	index, _ = Load("index_test")
+	index, _ = LoadDeferred("index_test")
 }
 
 func TestAnalyze(t *testing.T) {
@@ -24,6 +24,24 @@ func TestAnalyze(t *testing.T) {
 	res = index.Analyze("シェフ、庭師")
 	expected = []string{"シェフ", "庭師"}
 	assert.Equal(t, expected, res)
+}
+
+func BenchmarkAnalyze(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		index.Analyze("lunar new year")
+	}
+}
+
+func BenchmarkFindDocuments(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		index.findDocuments([]string{"lunar", "new", "year"})
+	}
+}
+
+func BenchmarkSearch(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		index.Search("lunar new year")
+	}
 }
 
 func TestIndexWithIDAndSearch(t *testing.T) {
@@ -96,12 +114,6 @@ func TestIndexAndSearchJSONLines(t *testing.T) {
 	res, _ := index.Search("cooking")
 	assert.Equal(t, len(res.Hits), 1)
 	assert.Equal(t, res.Hits[0].Source, expectedResult)
-}
-
-func BenchmarkSearch(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		index.Search("ashtanga yoga los angeles")
-	}
 }
 
 func TestUpdate(t *testing.T) {

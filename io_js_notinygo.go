@@ -1,3 +1,4 @@
+//go:build js && !tinygo
 // +build js,!tinygo
 
 package folder
@@ -36,7 +37,7 @@ func (index *Index) loadFieldNamesDeferred() (err error) {
 	return
 }
 
-func (index *Index) fetchDocumentFromShard(shardID int, documentID string) (document map[string]interface{}, err error) {
+func (index *Index) fetchDocumentFromShard(shardID uint32, documentID string) (document map[string]interface{}, err error) {
 	var resp *http.Response
 	var ok bool
 
@@ -61,7 +62,7 @@ func (index *Index) fetchDocumentFromShard(shardID int, documentID string) (docu
 	return
 }
 
-func (index *Index) loadDocumentsFromShard(shardID int) (err error) {
+func (index *Index) loadDocumentsFromShard(shardID uint32) (err error) {
 	var resp *http.Response
 
 	if _, ok := index.LoadedDocumentsShards[shardID]; ok {
@@ -87,33 +88,7 @@ func (index *Index) loadDocumentsFromShard(shardID int) (err error) {
 	return
 }
 
-func (index *Index) loadDocumentStatsFromShard(shardID int) (err error) {
-	var resp *http.Response
-
-	if _, ok := index.LoadedDocumentStatsShards[shardID]; ok {
-		return
-	}
-
-	url := fmt.Sprintf("%s/%s/%d/%s", index.baseURL, index.Name, shardID, DocumentStatsFileExtension)
-	debug("  Loading document stats shard:", url)
-
-	resp, err = http.Get(url)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	err = index.loadDocumentStatsFromReader(resp.Body)
-	if err != nil {
-		return
-	}
-
-	index.LoadedDocumentStatsShards[shardID] = struct{}{}
-
-	return
-}
-
-func (index *Index) loadTermStatsFromShard(shardID int) (err error) {
+func (index *Index) loadTermStatsFromShard(shardID uint32) (err error) {
 	var resp *http.Response
 
 	if _, ok := index.LoadedTermStatsShards[shardID]; ok {

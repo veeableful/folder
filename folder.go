@@ -7,39 +7,30 @@ import (
 
 // Index contains all the information needed to search and return matching documents.
 type Index struct {
-	Name                      string
-	FieldNames                []string
-	Documents                 map[string]map[string]interface{}
-	DocumentStats             map[string]DocumentStat
-	TermStats                 map[string]TermStat
-	LoadedDocumentsShards     map[int]struct{}
-	LoadedDocumentStatsShards map[int]struct{}
-	LoadedTermStatsShards     map[int]struct{}
-	ShardCount                int
-	f                         fs.FS
-	baseURL                   string
+	Name                  string
+	FieldNames            []string
+	Documents             map[string]map[string]interface{}
+	TermStats             map[string]TermStat
+	LoadedDocumentsShards map[uint32]struct{}
+	LoadedTermStatsShards map[uint32]struct{}
+	ShardCount            int
+	f                     fs.FS
+	baseURL               string
 }
 
 // New creates an empty index.
 func New() (index *Index) {
 	index = &Index{}
 	index.Documents = make(map[string]map[string]interface{})
-	index.DocumentStats = make(map[string]DocumentStat)
 	index.TermStats = make(map[string]TermStat)
-	index.LoadedDocumentStatsShards = make(map[int]struct{})
-	index.LoadedDocumentsShards = make(map[int]struct{})
-	index.LoadedTermStatsShards = make(map[int]struct{})
+	index.LoadedDocumentsShards = make(map[uint32]struct{})
+	index.LoadedTermStatsShards = make(map[uint32]struct{})
 	return
-}
-
-// DocumentStat contains information specific to documents.
-type DocumentStat struct {
-	TermFrequency map[string]int
 }
 
 // TermStat contains information specific to terms.
 type TermStat struct {
-	DocumentIDs []string
+	TermFrequencies map[string]int
 }
 
 // SearchTime contains the elapsed times during various stages in the search process.
@@ -131,7 +122,6 @@ func (index *Index) Delete(documentID string) (err error) {
 		}
 	}
 
-	delete(index.DocumentStats, documentID)
 	err = index.removeDocumentFromTermStats(documentID, allTokens.List())
 	return
 }

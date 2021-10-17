@@ -92,49 +92,6 @@ func (index *Index) loadDocumentsFromReader(r io.Reader) (err error) {
 	return
 }
 
-func (index *Index) loadDocumentStatsFromReader(r io.Reader) (err error) {
-	csvr := csv.NewReader(r)
-
-	var record []string
-	_, err = csvr.Read()
-	if err != nil {
-		if err == io.EOF {
-			err = nil
-			return
-		}
-		return
-	}
-
-	for {
-		record, err = csvr.Read()
-		if err != nil {
-			if err == io.EOF {
-				err = nil
-				break
-			}
-			return
-		}
-
-		id := record[0]
-		tfs := strings.Split(record[1], " ")
-		for _, v := range tfs {
-			vv := strings.Split(v, ":")
-			term := vv[0]
-			frequency := vv[1]
-
-			if _, ok := index.DocumentStats[id]; !ok {
-				index.DocumentStats[id] = DocumentStat{TermFrequency: make(map[string]int)}
-			}
-
-			index.DocumentStats[id].TermFrequency[term], err = strconv.Atoi(frequency)
-			if err != nil {
-				return
-			}
-		}
-	}
-	return
-}
-
 func (index *Index) loadTermStatsFromReader(r io.Reader) (err error) {
 	var record []string
 
@@ -152,8 +109,20 @@ func (index *Index) loadTermStatsFromReader(r io.Reader) (err error) {
 
 		term := record[0]
 		termStat := index.TermStats[term]
-		ids := strings.Split(record[1], " ")
-		termStat.DocumentIDs = append(index.TermStats[term].DocumentIDs, ids...)
+		tfs := strings.Split(record[1], " ")
+		if termStat.TermFrequencies == nil {
+			termStat.TermFrequencies = make(map[string]int)
+		}
+		for _, v := range tfs {
+			vv := strings.Split(v, ":")
+			id := vv[0]
+			frequency := vv[1]
+
+			termStat.TermFrequencies[id], err = strconv.Atoi(frequency)
+			if err != nil {
+				return
+			}
+		}
 		index.TermStats[term] = termStat
 	}
 	return

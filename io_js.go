@@ -1,3 +1,4 @@
+//go:build js
 // +build js
 
 package folder
@@ -7,10 +8,9 @@ import (
 )
 
 const (
-	FieldNamesFileExtension    = "fns"
-	DocumentsFileExtension     = "dcs"
-	DocumentStatsFileExtension = "dst"
-	TermStatsFileExtension     = "tst"
+	FieldNamesFileExtension = "fns"
+	DocumentsFileExtension  = "dcs"
+	TermStatsFileExtension  = "tst"
 )
 
 type ProgressCallback func(loadedShardsCount, totalShardsCount int)
@@ -36,7 +36,7 @@ func LoadDeferred(indexName, baseURL string) (index *Index, err error) {
 
 func (index *Index) LoadAllShards(progressCallback ProgressCallback, sleepDuration time.Duration) (err error) {
 	for i := 0; i < index.ShardCount; i++ {
-		err = index.loadShard(i)
+		err = index.loadShard(uint32(i))
 		if err != nil {
 			return
 		}
@@ -47,13 +47,8 @@ func (index *Index) LoadAllShards(progressCallback ProgressCallback, sleepDurati
 	return
 }
 
-func (index *Index) loadShard(shardID int) (err error) {
+func (index *Index) loadShard(shardID uint32) (err error) {
 	err = index.loadDocumentsFromShard(shardID)
-	if err != nil {
-		return
-	}
-
-	err = index.loadDocumentStatsFromShard(shardID)
 	if err != nil {
 		return
 	}

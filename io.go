@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package folder
@@ -16,11 +17,10 @@ import (
 )
 
 const (
-	FieldNamesFileExtension    = "fns"
-	DocumentsFileExtension     = "dcs"
-	DocumentStatsFileExtension = "dst"
-	TermStatsFileExtension     = "tst"
-	ShardCountFileName         = "shard_count"
+	FieldNamesFileExtension = "fns"
+	DocumentsFileExtension  = "dcs"
+	TermStatsFileExtension  = "tst"
+	ShardCountFileName      = "shard_count"
 )
 
 type ProgressCallback func(loadedShardsCount, totalShardsCount int)
@@ -36,11 +36,6 @@ func Load(indexName string) (index *Index, err error) {
 	}
 
 	err = index.loadDocuments()
-	if err != nil {
-		return
-	}
-
-	err = index.loadDocumentStats()
 	if err != nil {
 		return
 	}
@@ -125,11 +120,6 @@ func LoadFS(f fs.FS, indexName string) (index *Index, err error) {
 	}
 
 	err = index.loadDocumentsFS(f)
-	if err != nil {
-		return
-	}
-
-	err = index.loadDocumentStatsFS(f)
 	if err != nil {
 		return
 	}
@@ -237,11 +227,6 @@ func (index *Index) LoadAllShards(progressCallback ProgressCallback, sleepDurati
 			return
 		}
 
-		err = index.loadDocumentStatsFromShard(uint32(i))
-		if err != nil {
-			return
-		}
-
 		err = index.loadTermStatsFromShard(uint32(i))
 		if err != nil {
 			return
@@ -269,7 +254,7 @@ func (index *Index) loadDocuments() (err error) {
 func (index *Index) fetchDocumentFromShard(shardID uint32, documentID string) (document map[string]interface{}, err error) {
 	var file fs.File
 
-	if _, ok := index.LoadedDocumentsShards[int(shardID)]; ok {
+	if _, ok := index.LoadedDocumentsShards[shardID]; ok {
 		return
 	}
 
@@ -297,7 +282,7 @@ func (index *Index) fetchDocumentFromShard(shardID uint32, documentID string) (d
 func (index *Index) loadDocumentsFromShard(shardID uint32) (err error) {
 	var file fs.File
 
-	if _, ok := index.LoadedDocumentsShards[int(shardID)]; ok {
+	if _, ok := index.LoadedDocumentsShards[shardID]; ok {
 		return
 	}
 
@@ -319,7 +304,7 @@ func (index *Index) loadDocumentsFromShard(shardID uint32) (err error) {
 		return
 	}
 
-	index.LoadedDocumentsShards[int(shardID)] = struct{}{}
+	index.LoadedDocumentsShards[shardID] = struct{}{}
 
 	return
 }
@@ -352,62 +337,6 @@ func documentFromRecord(headers, record []string) (document map[string]interface
 	return
 }
 
-func (index *Index) loadDocumentStats() (err error) {
-	var file *os.File
-
-	file, err = os.Open(fmt.Sprintf("%s.%s", index.Name, DocumentStatsFileExtension))
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	err = index.loadDocumentStatsFromReader(file)
-	return
-}
-
-func (index *Index) loadDocumentStatsFromShard(shardID uint32) (err error) {
-	var file fs.File
-
-	if _, ok := index.LoadedDocumentStatsShards[int(shardID)]; ok {
-		return
-	}
-
-	filePath := fmt.Sprintf("%s/%d/%s", index.Name, shardID, DocumentStatsFileExtension)
-	debug("  Loading document stats shard:", filePath)
-
-	if index.f == nil {
-		file, err = os.Open(filePath)
-	} else {
-		file, err = index.f.Open(filePath)
-	}
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	err = index.loadDocumentStatsFromReader(file)
-	if err != nil {
-		return
-	}
-
-	index.LoadedDocumentStatsShards[int(shardID)] = struct{}{}
-
-	return
-}
-
-func (index *Index) loadDocumentStatsFS(f fs.FS) (err error) {
-	var file fs.File
-
-	file, err = f.Open(fmt.Sprintf("%s.%s", index.Name, DocumentStatsFileExtension))
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	err = index.loadDocumentStatsFromReader(file)
-	return
-}
-
 func (index *Index) loadTermStats() (err error) {
 	var file *os.File
 
@@ -424,7 +353,7 @@ func (index *Index) loadTermStats() (err error) {
 func (index *Index) loadTermStatsFromShard(shardID uint32) (err error) {
 	var file fs.File
 
-	if _, ok := index.LoadedTermStatsShards[int(shardID)]; ok {
+	if _, ok := index.LoadedTermStatsShards[shardID]; ok {
 		return
 	}
 
@@ -446,7 +375,7 @@ func (index *Index) loadTermStatsFromShard(shardID uint32) (err error) {
 		return
 	}
 
-	index.LoadedTermStatsShards[int(shardID)] = struct{}{}
+	index.LoadedTermStatsShards[shardID] = struct{}{}
 
 	return
 }
@@ -477,11 +406,6 @@ func (index *Index) Save(indexName string) (err error) {
 		return
 	}
 
-	err = index.saveDocumentStats()
-	if err != nil {
-		return
-	}
-
 	err = index.saveTermStats()
 	if err != nil {
 		return
@@ -505,11 +429,6 @@ func (index *Index) SaveToShards(indexName string, shardCount int) (err error) {
 	}
 
 	err = index.saveDocumentsToShards()
-	if err != nil {
-		return
-	}
-
-	err = index.saveDocumentStatsToShards()
 	if err != nil {
 		return
 	}
@@ -671,81 +590,6 @@ func recordFromDocument(id string, headers []string, document map[string]interfa
 	return
 }
 
-func (index *Index) saveDocumentStats() (err error) {
-	var file *os.File
-
-	file, err = os.OpenFile(fmt.Sprintf("%s.%s", index.Name, DocumentStatsFileExtension), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	w := csv.NewWriter(file)
-
-	for id, documentStat := range index.DocumentStats {
-		record := []string{id}
-		pairs := []string{}
-
-		for term, frequency := range documentStat.TermFrequency {
-			frequencyStr := strconv.Itoa(frequency)
-			pairs = append(pairs, strings.Join([]string{term, frequencyStr}, ":"))
-		}
-
-		record = append(record, strings.Join(pairs, " "))
-		w.Write(record)
-	}
-	w.Flush()
-
-	return
-}
-
-func (index *Index) saveDocumentStatsToShards() (err error) {
-	shardDocumentIDsMap := make(map[int][]string)
-
-	for documentID := range index.DocumentStats {
-		shardID := index.CalculateShardID(documentID)
-		shardDocumentIDsMap[int(shardID)] = append(shardDocumentIDsMap[int(shardID)], documentID)
-	}
-
-	for shardID, documentIDs := range shardDocumentIDsMap {
-		var file *os.File
-
-		dirPath := fmt.Sprintf("%s/%d/", index.Name, shardID)
-		err = os.MkdirAll(dirPath, 0700)
-		if err != nil {
-			return
-		}
-
-		filePath := fmt.Sprintf("%s/%s", dirPath, DocumentStatsFileExtension)
-		file, err = os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
-		if err != nil {
-			return err
-		}
-		w := csv.NewWriter(file)
-
-		for _, documentID := range documentIDs {
-			record := []string{documentID}
-			pairs := []string{}
-
-			documentStat := index.DocumentStats[documentID]
-			for term, frequency := range documentStat.TermFrequency {
-				frequencyStr := strconv.Itoa(frequency)
-				pairs = append(pairs, strings.Join([]string{term, frequencyStr}, ":"))
-			}
-
-			record = append(record, strings.Join(pairs, " "))
-			shardID := index.CalculateShardID(documentID)
-			shardDocumentIDsMap[int(shardID)] = append(shardDocumentIDsMap[int(shardID)], documentID)
-			w.Write(record)
-		}
-
-		w.Flush()
-		file.Close()
-	}
-
-	return
-}
-
 func (index *Index) saveTermStats() (err error) {
 	var file *os.File
 
@@ -759,7 +603,14 @@ func (index *Index) saveTermStats() (err error) {
 
 	for term, stat := range index.TermStats {
 		record := []string{term}
-		record = append(record, strings.Join(stat.DocumentIDs, " "))
+		pairs := []string{}
+
+		for documentID, frequency := range stat.TermFrequencies {
+			frequencyStr := strconv.Itoa(frequency)
+			pairs = append(pairs, strings.Join([]string{documentID, frequencyStr}, ":"))
+		}
+
+		record = append(record, strings.Join(pairs, " "))
 		w.Write(record)
 	}
 	w.Flush()
@@ -795,7 +646,14 @@ func (index *Index) saveTermStatsToShards() (err error) {
 		for _, term := range terms {
 			stat := index.TermStats[term]
 			record := []string{term}
-			record = append(record, strings.Join(stat.DocumentIDs, " "))
+			pairs := []string{}
+
+			for documentID, frequency := range stat.TermFrequencies {
+				frequencyStr := strconv.Itoa(frequency)
+				pairs = append(pairs, strings.Join([]string{documentID, frequencyStr}, ":"))
+			}
+
+			record = append(record, strings.Join(pairs, " "))
 			w.Write(record)
 		}
 
