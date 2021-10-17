@@ -66,6 +66,10 @@ func main() {
 
 These file formats are not final and may change in the future.
 
+**shard_count**
+
+Contains the number of shards in the index.
+
 **fns**
 
 Newline-separated list of fields. Nested fields are joined together with their parent fields by dots.
@@ -73,10 +77,6 @@ Newline-separated list of fields. Nested fields are joined together with their p
 **dcs**
 
 Contains the documents in CSV format.
-
-**dst**
-
-Contains the document stats in CSV format.
 
 **tst**
 
