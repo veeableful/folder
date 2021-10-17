@@ -188,7 +188,12 @@ func (index *Index) removeDocumentFromTermStats(documentID string, tokens []stri
 }
 
 func (index *Index) nextDocumentID() (id string) {
-	id = generateRandomID(32)
+	for {
+		id = generateRandomID(8)
+		if _, ok := index.Documents[id]; !ok {
+			break
+		}
+	}
 	return
 }
 
